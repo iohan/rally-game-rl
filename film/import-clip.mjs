@@ -1,6 +1,6 @@
-// Importera ett eget inspelat klipp (från spelets ?rec-läge, tangent V) till filmpipelinen.
+// Imports a clip you recorded yourself (from the game's ?rec mode, key V) into the film pipeline.
 //   node import-clip.mjs ~/Downloads/asphalt-race-16x9-....webm step1_game_16x9
-// Konverterar till mp4 i rätt storlek/30 fps, lägger i public/clips/ och registrerar längden i index.json.
+// Converts to mp4 at the right size/30 fps, puts it in public/clips/ and registers its length in index.json.
 import { spawnSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -8,9 +8,9 @@ import { fileURLToPath } from 'node:url';
 import { FORMATS, FPS } from './src/scenes.js';
 
 const [src, name] = process.argv.slice(2);
-if (!src || !name) { console.error('användning: node import-clip.mjs <videofil> <klippnamn t.ex. step1_game_16x9>'); process.exit(1); }
+if (!src || !name) { console.error('usage: node import-clip.mjs <video file> <clip name, e.g. step1_game_16x9>'); process.exit(1); }
 const fmt = FORMATS.find(f => name.endsWith('_' + f.id));
-if (!fmt) { console.error('klippnamnet måste sluta på ett format: ' + FORMATS.map(f => '_' + f.id).join(', ')); process.exit(1); }
+if (!fmt) { console.error('the clip name must end with a format: ' + FORMATS.map(f => '_' + f.id).join(', ')); process.exit(1); }
 const here = path.dirname(fileURLToPath(import.meta.url));
 const bin = path.join(here, 'node_modules', '.bin', 'remotion');
 const out = path.join(here, 'public', 'clips', name + '.mp4');
@@ -23,4 +23,4 @@ const indexFile = path.join(here, 'public', 'clips', 'index.json');
 const index = JSON.parse(await readFile(indexFile, 'utf8'));
 index[name] = frames;
 await writeFile(indexFile, JSON.stringify(index, null, 1));
-console.log(`${name}.mp4: ${frames} frames (${(frames / FPS).toFixed(1)} s) -> rendera med: node render.mjs ${name.split('_')[0]}`);
+console.log(`${name}.mp4: ${frames} frames (${(frames / FPS).toFixed(1)} s) -> render with: node render.mjs ${name.split('_')[0]}`);

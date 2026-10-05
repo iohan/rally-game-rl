@@ -1,4 +1,4 @@
-// Animerade träningskurvor (data från public/curves.json, skapad av train/export_curves_json.py)
+// Animated training curves (data from public/curves.json, created by train/export_curves_json.py)
 import React from 'react';
 import { AbsoluteFill, useCurrentFrame, interpolate } from 'remotion';
 import { FPS } from './scenes.js';

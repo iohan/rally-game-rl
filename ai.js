@@ -1,11 +1,11 @@
 // ============================================================
-//  ai.js – AI-förare i webbläsaren. Bygger samma observation som
-//  train/env.py och kör det exporterade nätet (model.json) framåt.
-//  Allt här måste matcha env.py exakt; verifieras av train/check_ai.js.
+//  ai.js – AI driver in the browser. Builds the same observation as
+//  train/env.py and runs the exported network (model.json) forward.
+//  Everything here must match env.py exactly; verified by train/check_ai.js.
 // ============================================================
 'use strict';
 
-const AI_DECISION_DT = 2 / 60;   // FRAME_SKIP=2 i env.py -> 30 beslut/s
+const AI_DECISION_DT = 2 / 60;   // FRAME_SKIP=2 in env.py -> 30 decisions/s
 
 class AiDriver {
   constructor(model, track) {
@@ -14,7 +14,7 @@ class AiDriver {
     this.nRay = Math.round(this.cfg.rayMax / this.cfg.rayStep);
   }
 
-  // Avstånd längs strålen tills mittlinjeavståndet > HALF_W. Samma sampling som env._ray.
+  // Distance along the ray until the centre-line distance > HALF_W. Same sampling as env._ray.
   ray(car, idx, ang) {
     const t = this.track, N = t.N, cfg = this.cfg;
     const cx = car.x, cy = car.y, ca = Math.cos(ang), sa = Math.sin(ang);

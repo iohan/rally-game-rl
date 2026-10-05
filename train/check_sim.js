@@ -1,4 +1,4 @@
-// Kör en fast styrsekvens i sim.js och skriver banan som JSON (jämförs mot Python i check_sim.py)
+// Runs a fixed control sequence in sim.js and writes the trajectory as JSON (compared against Python in check_sim.py)
 const s = require('../sim.js');
 const t = s.buildTrack();
 const p = t.pts[t.N - s.START_IDX_FROM_END];

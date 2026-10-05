@@ -1,30 +1,30 @@
 // ============================================================
-//  sim.js – ren spel-logik utan Phaser/DOM.
-//  Delas av spelet (index.html) och är förlagan till träningsmiljön
-//  (train/sim.py). Ändrar du något här måste Python-porten uppdateras.
+//  sim.js – pure game logic without Phaser/DOM.
+//  Shared by the game (index.html) and the template for the training
+//  environment (train/sim.py). If you change anything here, update the Python port.
 // ============================================================
 'use strict';
 
 const WORLD_W = 4200, WORLD_H = 3000;
-const HALF_W = 80;          // halva vägbredden
-const KERB_W = 18;          // kantstensbredd
-const CAR_R = 16;           // kollisionsradie bil
+const HALF_W = 80;          // half road width
+const KERB_W = 18;          // kerb width
+const CAR_R = 16;           // car collision radius
 const TAU = Math.PI * 2;
 
-// Kontrollpunkter för banan (sluten Catmull-Rom-slinga, medurs)
+// Control points for the track (closed Catmull-Rom loop, clockwise)
 const CONTROL = [
-  [520, 1750], [520, 1150],                       // start/mål-rakan (norrut)
-  [700, 700], [1150, 520],                        // kurva 1, in på toppen
-  [1500, 560], [1750, 690], [2000, 560],          // chikan
-  [2400, 480], [2900, 560], [3450, 820],          // lång svepande högersväng
-  [3700, 1150], [3700, 1450], [3400, 1520],       // hårnål
-  [2950, 1380], [2600, 1320],                     // tillbaka västerut
-  [2340, 1620], [2560, 1960], [2300, 2300],       // S-kurvor
-  [1900, 2450], [1350, 2350],                     // nedre rakan
-  [1000, 2550], [600, 2400], [480, 2100]          // sista slingan upp mot start
+  [520, 1750], [520, 1150],                       // start/finish straight (northbound)
+  [700, 700], [1150, 520],                        // turn 1, onto the top
+  [1500, 560], [1750, 690], [2000, 560],          // chicane
+  [2400, 480], [2900, 560], [3450, 820],          // long sweeping right-hander
+  [3700, 1150], [3700, 1450], [3400, 1520],       // hairpin
+  [2950, 1380], [2600, 1320],                     // back westwards
+  [2340, 1620], [2560, 1960], [2300, 2300],       // S-bends
+  [1900, 2450], [1350, 2350],                     // bottom straight
+  [1000, 2550], [600, 2400], [480, 2100]          // final loop up towards the start
 ];
 
-// Underlag
+// Surfaces
 const SURF = {
   asphalt: { max: 640, rate: 0.75, drag: 0.25, over: 1.0, roll: 20, grip: 9 },
   kerb:    { max: 600, rate: 0.70, drag: 0.35, over: 1.2, roll: 30, grip: 7 },
@@ -32,7 +32,7 @@ const SURF = {
   gravel:  { max: 160, rate: 1.00, drag: 2.00, over: 4.0, roll: 90, grip: 2.2 },
 };
 const BRAKE = 650, REV_MAX = 180, REV_ACC = 220, TURN = 2.6;
-const START_IDX_FROM_END = 12;   // bilen startar på pts[N - 12]
+const START_IDX_FROM_END = 12;   // the car starts at pts[N - 12]
 
 function wrapAngle(a) { while (a > Math.PI) a -= TAU; while (a < -Math.PI) a += TAU; return a; }
 function cr(p0, p1, p2, p3, t) {
@@ -44,7 +44,7 @@ function cr(p0, p1, p2, p3, t) {
 }
 
 // ============================================================
-//  Bana: mittlinje som ~10 px-samplade punkter med tangent, normal, kurvatur
+//  Track: centre line sampled every ~10 px with tangent, normal, curvature
 // ============================================================
 function buildTrack(control = CONTROL) {
   const raw = [], n = control.length, S = 24;
@@ -72,11 +72,11 @@ function buildTrack(control = CONTROL) {
   }
   const rawCurv = pts.map((p, k) => wrapAngle(pts[(k + 2) % N].ang - pts[(k - 2 + N) % N].ang) / (4 * step));
   for (let k = 0; k < N; k++) { let s = 0; for (let w = -4; w <= 4; w++) s += rawCurv[(k + w + N) % N]; pts[k].curv = s / 9; }
-  // Kantstensavsnitt: kurvor med radie < 380
+  // Kerb sections: corners with radius < 380
   const kerb = pts.map(p => Math.abs(p.curv) > 1 / 380);
   const grown = kerb.slice();
   for (let k = 0; k < N; k++) if (kerb[k]) for (let w = -6; w <= 6; w++) grown[(k + w + N) % N] = true;
-  // hitta sammanhängande körningar (med wrap)
+  // find contiguous runs (with wrap)
   let start0 = grown.indexOf(false); if (start0 < 0) start0 = 0;
   const runs = []; let cur = null;
   for (let s = 0; s < N; s++) {
@@ -96,18 +96,18 @@ function buildTrack(control = CONTROL) {
 }
 
 // ============================================================
-//  Bilfysik: ett tidssteg. Muterar car {x,y,rot,vx,vy,fwd,lat}.
-//  throttle: 1 gas, -1 broms/back, 0 inget.  steer: -1 vänster, 1 höger, 0 rakt.
-//  S: underlagsparametrar (SURF[...]).
+//  Car physics: one time step. Mutates car {x,y,rot,vx,vy,fwd,lat}.
+//  throttle: 1 throttle, -1 brake/reverse, 0 none.  steer: -1 left, 1 right, 0 straight.
+//  S: surface parameters (SURF[...]).
 // ============================================================
 function stepCar(car, throttle, steer, dt, S) {
-  // styrning
+  // steering
   let fwd0 = car.vx * Math.cos(car.rot) + car.vy * Math.sin(car.rot);
   const sf = Math.min(1, Math.abs(fwd0) / 200);
   const hs = 1 - 0.45 * Math.min(1, Math.abs(fwd0) / 640);
   car.rot += steer * TURN * sf * hs * Math.sign(fwd0) * dt;
 
-  // dela upp hastighet i den nya riktningen
+  // split velocity along the new heading
   const fx = Math.cos(car.rot), fy = Math.sin(car.rot);
   let fwd = car.vx * fx + car.vy * fy;
   let lat = -car.vx * fy + car.vy * fx;
@@ -126,5 +126,5 @@ function stepCar(car, throttle, steer, dt, S) {
   car.x += car.vx * dt; car.y += car.vy * dt;
 }
 
-// Node-export för tester/jämförelse mot Python-porten (ignoreras i webbläsaren)
+// Node export for tests/comparison against the Python port (ignored in the browser)
 if (typeof module !== 'undefined') module.exports = { WORLD_W, WORLD_H, HALF_W, KERB_W, CAR_R, TAU, CONTROL, SURF, BRAKE, REV_MAX, REV_ACC, TURN, START_IDX_FROM_END, wrapAngle, cr, buildTrack, stepCar };

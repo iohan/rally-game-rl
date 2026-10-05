@@ -1,8 +1,8 @@
-// Spelar in spelklipp med Playwright: spelet stegas deterministiskt frame för frame (window.filmAdvance)
-// och varje frame (JPEG) pipas till ffmpeg. Resultat: public/clips/<namn>_<format>.mp4 + index.json.
-//   node record.mjs                 klipp som saknas
-//   node record.mjs step2c          bara klipp vars scen-id börjar så
-//   node record.mjs "" --force      spela om allt (make.sh gör detta)
+// Records game clips with Playwright: the game is stepped deterministically frame by frame (window.filmAdvance)
+// and every frame (JPEG) is piped to ffmpeg. Result: public/clips/<name>_<format>.mp4 + index.json.
+//   node record.mjs                 missing clips only
+//   node record.mjs step2c          only clips whose scene id starts like that
+//   node record.mjs "" --force      redo everything (make.sh does this)
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -13,14 +13,14 @@ import { fileURLToPath } from 'node:url';
 import { SCENES, FORMATS, FPS } from './src/scenes.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.join(here, '..');           // spelets mapp (index.html)
+const ROOT = path.join(here, '..');           // the game folder (index.html)
 const OUT = path.join(here, 'public', 'clips');
 const FFMPEG = path.join(here, 'node_modules', '.bin', 'remotion');
 const filter = process.argv[2] || '';
 const force = process.argv.includes('--force');
-const all = process.argv.includes('--all');      // spela även in klipp markerade manual: true (med regelföraren)
+const all = process.argv.includes('--all');      // also record clips marked manual: true (with the rule-based driver)
 
-// Liten statisk server för spelet (python3 -m http.server fungerar också, men detta är självförsörjande)
+// Small static server for the game (python3 -m http.server works too, but this is self-contained)
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json' };
 const server = createServer(async (req, res) => {
   const p = path.join(ROOT, decodeURIComponent(new URL(req.url, 'http://x').pathname.replace(/\/$/, '/index.html')));
@@ -71,14 +71,14 @@ for (const scene of SCENES) {
     const name = `${clip.name}_${fmt.id}`;
     if (clip.manual && !all) {
       const have = index[name] && existsSync(path.join(OUT, name + '.mp4'));
-      console.log(`${name}: manuellt klipp, ${have ? 'använder importerat' : 'SAKNAS – spela in med ?rec=' + fmt.id + ' och importera med import-clip.mjs'}`);
+      console.log(`${name}: manual clip, ${have ? 'using imported' : 'MISSING – record with ?rec=' + fmt.id + ' and import with import-clip.mjs'}`);
       continue;
     }
-    if (!force && index[name] && existsSync(path.join(OUT, name + '.mp4'))) { console.log(`${name}: finns redan (hoppar över, --force spelar om)`); continue; }
+    if (!force && index[name] && existsSync(path.join(OUT, name + '.mp4'))) { console.log(`${name}: already exists (skipping, --force re-records)`); continue; }
     let result, lastErr;
     for (let attempt = 1; attempt <= 3 && !result; attempt++) {
       try { result = await record(clip, fmt); }
-      catch (e) { lastErr = e; console.log(`${name}: försök ${attempt} misslyckades (${e.message.split('\n')[0]})`); }
+      catch (e) { lastErr = e; console.log(`${name}: attempt ${attempt} failed (${e.message.split('\n')[0]})`); }
     }
     if (!result) throw lastErr;
     index[result[0]] = result[1];
@@ -86,4 +86,4 @@ for (const scene of SCENES) {
   }
 }
 server.close();
-console.log('klart ->', OUT);
+console.log('done ->', OUT);

@@ -1,6 +1,6 @@
-// Renderar alla filmer: bundlar Remotion-projektet en gång, sedan en MP4 per scen och format -> out/
-//   node render.mjs            alla
-//   node render.mjs steg3      bara scener vars id börjar så
+// Renders all films: bundles the Remotion project once, then one MP4 per scene and format -> out/
+//   node render.mjs            all
+//   node render.mjs step3      only scenes whose id starts like that
 import { bundle } from '@remotion/bundler';
 import { renderMedia, selectComposition } from '@remotion/renderer';
 import path from 'node:path';

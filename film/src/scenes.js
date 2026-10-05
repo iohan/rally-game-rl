@@ -11,8 +11,8 @@ export const FORMATS = [
 export const SCENES = [
   {
     id: 'step1', title: 'Step 1', heading: 'A game', text: 'A top-down racing game built in Phaser. You drive around Granskogsbanan GP yourself.',
-    // manual: true -> record.mjs hoppar över klippet; spela in själv med ?rec=16x9 / ?rec=9x16 + V och importera med import-clip.mjs.
-    // Ta bort manual (eller kör record.mjs med --all) så körs klippet av regelföraren istället.
+    // manual: true -> record.mjs skips the clip; record it yourself with ?rec=16x9 / ?rec=9x16 + V and import with import-clip.mjs.
+    // Remove manual (or run record.mjs with --all) to have the rule-based driver drive it instead.
     clips: [{ name: 'step1_game', manual: true, params: { track: 0, driver: 'rule', sensors: 0 }, seconds: 24, caption: 'Manual driving – throttle, brake and steer with the arrow keys' }],
   },
   {

@@ -40,27 +40,27 @@
 <script>
 'use strict';
 // ============================================================
-//  Konstanter
+//  Constants
 // ============================================================
-// Bana, underlag och bilfysik ligger i sim.js (delas med träningen)
-// Filmläge (film/record.mjs): ?film=1&track=0&model=8&ai=1&sensors=1&driver=rule&zoom=1.2&ui=1.4
-// Spelloopen stoppas och stegas via window.filmAdvance(n) så varje frame blir deterministisk.
-// ui = HUD-skala i filmläge (större text för sociala medier).
+// Track, surfaces and car physics live in sim.js (shared with training)
+// Film mode (film/record.mjs): ?film=1&track=0&model=8&ai=1&sensors=1&driver=rule&zoom=1.2&ui=1.4
+// The game loop is stopped and stepped via window.filmAdvance(n) so every frame is deterministic.
+// ui = HUD scale in film mode (larger text for social media).
 const FILM = new URLSearchParams(location.search);
 const IS_FILM = FILM.get('film') === '1';
-// Inspelningsläge för egna klipp: ?rec=16x9 eller ?rec=9x16 låser canvasen till filmstorlek (skalas att passa
-// fönstret), V startar/stoppar inspelning av canvasen till .webm. Importera med film/import-clip.mjs.
-const REC_FORMATS = { '16x9': { w: 1920, h: 1080, ui: 1.4, zoom: 1.2 }, '9x16': { w: 1080, h: 1920, ui: 1.1, zoom: 1.15 } };   // samma zoom/HUD som film/src/scenes.js
+// Record mode for your own clips: ?rec=16x9 or ?rec=9x16 locks the canvas to the film size (scaled to fit
+// the window), V starts/stops recording the canvas to .webm. Import with film/import-clip.mjs.
+const REC_FORMATS = { '16x9': { w: 1920, h: 1080, ui: 1.4, zoom: 1.2 }, '9x16': { w: 1080, h: 1920, ui: 1.1, zoom: 1.15 } };   // same zoom/HUD as film/src/scenes.js
 const REC = REC_FORMATS[FILM.get('rec')] || null;
 const IS_REC = !!REC;
 const DPR = (IS_FILM || IS_REC) ? 1 : Math.min(window.devicePixelRatio || 1, 2);
-const UI_SCALE = IS_FILM ? parseFloat(FILM.get('ui') || '1') : IS_REC ? parseFloat(FILM.get('ui') || REC.ui) : DPR;   // HUD:ens skala
+const UI_SCALE = IS_FILM ? parseFloat(FILM.get('ui') || '1') : IS_REC ? parseFloat(FILM.get('ui') || REC.ui) : DPR;   // HUD scale
 if (IS_REC) { document.body.classList.add('rec'); document.getElementById('rechint').style.display = ''; }
 const BASE_ZOOM = 0.9 * DPR * (IS_FILM ? parseFloat(FILM.get('zoom') || '1') : IS_REC ? parseFloat(FILM.get('zoom') || REC.zoom) : 1);
 
 
 // ============================================================
-//  Hjälpfunktioner
+//  Helpers
 // ============================================================
 function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const rnd = mulberry32(20261005);
@@ -78,12 +78,12 @@ function noiseTile(size, colors, count, rmin = 0.6, rmax = 1.6) {
 function fmtTime(ms) { if (ms == null) return '--:--.--'; const m = Math.floor(ms / 60000), s = Math.floor(ms % 60000 / 1000), cs = Math.floor(ms % 1000 / 10); return `${m}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`; }
 
 // ============================================================
-//  Miljö (träd, sjö, grus, depå ...)
+//  Environment (trees, lake, gravel, pits ...)
 // ============================================================
 function buildEnvironment(track) {
   const pts = track.pts;
   const distTo = (x, y) => track.nearest(x, y).dist;
-  // Sjön läggs där det är längst till banan; för liten plats -> ingen sjö
+  // The lake goes where the track is farthest away; too little room -> no lake
   let lake = null, bestD = 0;
   for (let x = 400; x < WORLD_W - 400; x += 100) for (let y = 300; y < WORLD_H - 300; y += 100) {
     const d = Math.min(distTo(x, y), Math.hypot(x - pts[0].x, y - pts[0].y) - 300);
@@ -91,7 +91,7 @@ function buildEnvironment(track) {
   }
   const lrx = Math.min(380, bestD - HALF_W - KERB_W - 70);
   lake = lrx >= 140 ? { ...lake, rx: lrx, ry: lrx * 0.63 } : null;
-  // Grusfällor på utsidan av de skarpaste kurvorna (lokala kurvaturmaxima)
+  // Gravel traps on the outside of the sharpest corners (local curvature maxima)
   const N = track.N, peaks = [];
   for (let k = 0; k < N; k++) {
     const c = Math.abs(pts[k].curv); if (c < 1 / 300) continue;
@@ -104,7 +104,7 @@ function buildEnvironment(track) {
     const off = HALF_W + KERB_W - 15 + ry;
     return { x: p.x + side * p.nx * off, y: p.y + side * p.ny * off, rx, ry, rot: p.ang, side };
   });
-  // Däckbarriärer längs grusfällornas yttre kant
+  // Tyre barriers along the outer edge of the gravel traps
   const tires = [];
   for (const g of gravels) {
     const c = Math.cos(g.rot), s = Math.sin(g.rot);
@@ -121,7 +121,7 @@ function buildEnvironment(track) {
   const inLake = (x, y, m = 1) => lake != null && inEll(lake, x, y, m);
   const inGravel = (x, y, m = 1) => gravels.some(g => inEll(g, x, y, m));
 
-  // Depåbyggnad utanför startrakan
+  // Pit building beside the start straight
   const p0 = pts[0];
   const APRON = 70, HD = 85, HL = 170;
   const bOff = HALF_W + APRON + HD + 8;
@@ -168,7 +168,7 @@ function buildEnvironment(track) {
 }
 
 // ============================================================
-//  Rendering av världen (en gång, till canvas-textur)
+//  World rendering (once, to a canvas texture)
 // ============================================================
 function pathAlong(ctx, pts, off, from, len, close) {
   const N = pts.length;
@@ -185,7 +185,7 @@ function renderWorld(track, env) {
   const { pts, N } = track;
   const c = mk(WORLD_W, WORLD_H), ctx = c.getContext('2d');
 
-  // --- Gräs ---
+  // --- Grass ---
   ctx.fillStyle = '#4b8a37'; ctx.fillRect(0, 0, WORLD_W, WORLD_H);
   const lo = mk(WORLD_W / 8, WORLD_H / 8), lc = lo.getContext('2d');
   lc.fillStyle = '#4b8a37'; lc.fillRect(0, 0, lo.width, lo.height);
@@ -197,17 +197,17 @@ function renderWorld(track, env) {
     lc.globalAlpha = 0.55; lc.fillStyle = g; lc.beginPath(); lc.arc(x, y, r, 0, TAU); lc.fill();
   }
   ctx.drawImage(lo, 0, 0, WORLD_W, WORLD_H);
-  // klippta ränder
+  // mowing stripes
   ctx.save(); ctx.globalAlpha = 0.045; ctx.fillStyle = '#ffffff';
   for (let x = -WORLD_H; x < WORLD_W; x += 240) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 120, 0); ctx.lineTo(x + 120 + WORLD_H, WORLD_H); ctx.lineTo(x + WORLD_H, WORLD_H); ctx.closePath(); ctx.fill(); }
   ctx.restore();
   const grassTile = noiseTile(128, ['rgba(255,255,255,0.07)', 'rgba(0,0,0,0.09)', 'rgba(140,210,90,0.12)', 'rgba(30,70,20,0.10)'], 900, 0.5, 1.4);
   ctx.fillStyle = ctx.createPattern(grassTile, 'repeat'); ctx.fillRect(0, 0, WORLD_W, WORLD_H);
 
-  // --- Blommor ---
+  // --- Flowers ---
   for (const f of env.flowers) { ctx.fillStyle = f.c; ctx.beginPath(); ctx.arc(f.x, f.y, R(1.4, 2.4), 0, TAU); ctx.fill(); }
 
-  // --- Sjö ---
+  // --- Lake ---
   const L = env.lake;
   if (L) {
   ctx.fillStyle = '#d9c795'; ellipse(ctx, L.x, L.y, L.rx + 26, L.ry + 20); ctx.fill();
@@ -220,25 +220,25 @@ function renderWorld(track, env) {
   for (let i = 0; i < 14; i++) { const x = L.x + R(-L.rx, L.rx) * 0.85, y = L.y + R(-L.ry, L.ry) * 0.85; ctx.beginPath(); ctx.ellipse(x, y, R(14, 40), R(3, 6), 0, 0, Math.PI); ctx.stroke(); }
   ctx.fillStyle = 'rgba(255,255,255,0.18)'; ellipse(ctx, L.x - 90, L.y - 60, 70, 26, -0.3); ctx.fill();
   ctx.restore();
-  // vass
+  // reeds
   for (let i = 0; i < 60; i++) { const a = R(0, TAU); const x = L.x + Math.cos(a) * (L.rx + R(4, 22)), y = L.y + Math.sin(a) * (L.ry + R(4, 18)); ctx.fillStyle = pick(['#2f6a2b', '#3d7f33', '#5a8c2e']); ctx.beginPath(); ctx.arc(x, y, R(2.5, 5), 0, TAU); ctx.fill(); }
   }
 
-  // --- Grusfällor ---
+  // --- Gravel traps ---
   const sandTile = noiseTile(96, ['rgba(255,255,255,0.18)', 'rgba(90,70,40,0.22)', 'rgba(0,0,0,0.08)'], 700, 0.5, 1.3);
   for (const g of env.gravels) {
     ctx.fillStyle = '#a89468'; ellipse(ctx, g.x, g.y, g.rx + 4, g.ry + 4, g.rot); ctx.fill();
     ctx.fillStyle = '#d2c094'; ellipse(ctx, g.x, g.y, g.rx, g.ry, g.rot); ctx.fill();
     ctx.save(); ellipse(ctx, g.x, g.y, g.rx, g.ry, g.rot); ctx.clip(); ctx.fillStyle = ctx.createPattern(sandTile, 'repeat'); ctx.fillRect(0, 0, WORLD_W, WORLD_H); ctx.restore();
   }
-  // --- Däckbarriärer ---
+  // --- Tyre barriers ---
   env.tires.forEach((t, i) => {
     ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(t.x + 2, t.y + 3, t.r, 0, TAU); ctx.fill();
     ctx.fillStyle = i % 4 === 0 ? '#d7262d' : i % 4 === 2 ? '#f2f2f0' : '#17171a'; ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, TAU); ctx.fill();
     ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.arc(t.x, t.y, t.r * 0.45, 0, TAU); ctx.fill();
   });
 
-  // --- Sliten vägren ---
+  // --- Worn verge ---
   ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   pathAlong(ctx, pts, 0, 0, N, true);
   ctx.strokeStyle = 'rgba(96,84,52,0.45)'; ctx.lineWidth = 2 * (HALF_W + KERB_W) + 34; ctx.filter = 'blur(10px)'; ctx.stroke();
@@ -246,7 +246,7 @@ function renderWorld(track, env) {
   ctx.strokeStyle = 'rgba(0,0,0,0.28)'; ctx.lineWidth = 2 * HALF_W + 8; ctx.filter = 'blur(5px)'; ctx.stroke();
   ctx.restore();
 
-  // --- Depåplatta ---
+  // --- Pit apron ---
   const B = env.building, AP = env.apron;
   {
     const from = (N - 48) % N, len = 72;
@@ -256,16 +256,16 @@ function renderWorld(track, env) {
     ctx.closePath();
     ctx.fillStyle = '#8e9093'; ctx.fill();
     ctx.save(); ctx.clip(); ctx.fillStyle = ctx.createPattern(noiseTile(96, ['rgba(255,255,255,0.08)', 'rgba(0,0,0,0.10)'], 700), 'repeat'); ctx.fillRect(0, 0, WORLD_W, WORLD_H);
-    // depårutor
+    // pit boxes
     ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 3;
     for (let s = 8; s < len - 8; s += 7) { const p = pts[(from + s) % N]; ctx.beginPath(); ctx.moveTo(p.x - p.nx * (HALF_W + 12), p.y - p.ny * (HALF_W + 12)); ctx.lineTo(p.x - p.nx * (HALF_W + AP - 6), p.y - p.ny * (HALF_W + AP - 6)); ctx.stroke(); }
     ctx.restore();
-    // gul depålinje mot banan
+    // yellow pit line towards the track
     ctx.save(); ctx.strokeStyle = '#f2c230'; ctx.lineWidth = 4; ctx.lineCap = 'butt';
     pathAlong(ctx, pts, -(HALF_W + 5), from, len, false); ctx.stroke(); ctx.restore();
   }
 
-  // --- Kantstenar ---
+  // --- Kerbs ---
   ctx.save(); ctx.lineCap = 'butt'; ctx.lineJoin = 'round';
   for (const run of track.runs) for (const side of [1, -1]) {
     const off = side * (HALF_W + KERB_W / 2);
@@ -276,7 +276,7 @@ function renderWorld(track, env) {
   }
   ctx.setLineDash([]); ctx.restore();
 
-  // --- Asfalt ---
+  // --- Asphalt ---
   const road = mk(WORLD_W, WORLD_H), rc = road.getContext('2d');
   rc.lineJoin = 'round'; rc.lineCap = 'round';
   pathAlong(rc, pts, 0, 0, N, true);
@@ -284,15 +284,15 @@ function renderWorld(track, env) {
   rc.globalCompositeOperation = 'source-atop';
   rc.fillStyle = rc.createPattern(noiseTile(128, ['rgba(255,255,255,0.07)', 'rgba(0,0,0,0.12)', 'rgba(120,120,130,0.10)'], 1300, 0.4, 1.3), 'repeat');
   rc.fillRect(0, 0, WORLD_W, WORLD_H);
-  // sliten spårlinje
+  // worn racing line
   rc.strokeStyle = 'rgba(15,15,18,0.30)'; rc.lineWidth = HALF_W * 0.95; rc.filter = 'blur(16px)'; rc.stroke(); rc.filter = 'none';
-  // kantlinjer
+  // edge lines
   rc.lineCap = 'butt'; rc.strokeStyle = 'rgba(255,255,255,0.85)'; rc.lineWidth = 3;
   pathAlong(rc, pts, HALF_W - 6, 0, N, true); rc.stroke();
   pathAlong(rc, pts, -(HALF_W - 6), 0, N, true); rc.stroke();
   ctx.drawImage(road, 0, 0);
 
-  // --- Start/mål ---
+  // --- Start/finish ---
   {
     const p = pts[0];
     ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.ang);
@@ -300,10 +300,10 @@ function renderWorld(track, env) {
     for (let r = 0; r < rows; r++) for (let j = 0, y = -span; y < span; y += cell, j++) {
       ctx.fillStyle = (r + j) % 2 ? '#111' : '#f5f5f5'; ctx.fillRect(r * cell - cell, y, cell, Math.min(cell, span - y));
     }
-    // startrutor
+    // grid boxes
     ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 3;
     for (let k = 0; k < 6; k++) { const x = -70 - k * 80, y = (k % 2 ? 1 : -1) * 36 - 16; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 40, y); ctx.lineTo(x - 40, y + 32); ctx.lineTo(x, y + 32); ctx.stroke(); }
-    // startportal
+    // start gantry
     ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(66, -HALF_W - 30, 12, 2 * HALF_W + 60);
     ctx.fillStyle = '#3a3c42'; ctx.fillRect(60, -HALF_W - 32, 12, 2 * HALF_W + 64);
     ctx.fillStyle = '#d7262d'; ctx.fillRect(58, -HALF_W - 32, 16, 10); ctx.fillRect(58, HALF_W + 22, 16, 10);
@@ -311,7 +311,7 @@ function renderWorld(track, env) {
     ctx.restore();
   }
 
-  // --- Depåbyggnad ---
+  // --- Pit building ---
   ctx.save(); ctx.translate(B.cx, B.cy); ctx.rotate(B.ang);
   ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.filter = 'blur(9px)'; ctx.fillRect(-B.hl + 12, -B.hd + 16, 2 * B.hl, 2 * B.hd); ctx.filter = 'none';
   ctx.fillStyle = '#6f727a'; ctx.fillRect(-B.hl, -B.hd, 2 * B.hl, 2 * B.hd);
@@ -320,29 +320,29 @@ function renderWorld(track, env) {
   ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-B.hl + 7, 0); ctx.lineTo(B.hl - 7, 0); ctx.stroke();
   ctx.fillStyle = 'rgba(0,0,0,0.18)';
   for (let i = -3; i <= 3; i++) ctx.fillRect(i * 46 - 10, -B.hd + 18, 20, 20);
-  // garageportar mot banan (+y)
+  // garage doors facing the track (+y)
   for (let i = -3; i <= 3; i++) { ctx.fillStyle = '#2c2f36'; ctx.fillRect(i * 46 - 16, B.hd - 7, 32, 7); ctx.fillStyle = '#f2c230'; ctx.fillRect(i * 46 - 16, B.hd - 2, 32, 2); }
   ctx.fillStyle = '#262930'; ctx.font = 'bold 56px "Avenir Next","Segoe UI",Helvetica,Arial,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText('PITS', 0, -4);
   ctx.restore();
 
-  // --- Stenar ---
+  // --- Rocks ---
   for (const r of env.rocks) {
     ctx.fillStyle = 'rgba(0,0,0,0.25)'; ellipse(ctx, r.x + 3, r.y + 4, r.r, r.r * 0.72, r.rot); ctx.fill();
     const g = ctx.createRadialGradient(r.x - r.r * 0.3, r.y - r.r * 0.3, 1, r.x, r.y, r.r); g.addColorStop(0, '#c9c7bd'); g.addColorStop(1, '#75736b');
     ctx.fillStyle = g; ellipse(ctx, r.x, r.y, r.r, r.r * 0.72, r.rot); ctx.fill();
   }
-  // --- Buskar ---
+  // --- Bushes ---
   for (const b of env.bushes) {
     ctx.fillStyle = 'rgba(0,0,0,0.22)'; ellipse(ctx, b.x + b.r * 0.3, b.y + b.r * 0.4, b.r, b.r * 0.85); ctx.fill();
     const g = ctx.createRadialGradient(b.x - b.r * 0.35, b.y - b.r * 0.35, 1, b.x, b.y, b.r); g.addColorStop(0, '#8ec85a'); g.addColorStop(1, '#3a7a2b');
     ctx.fillStyle = g; star(ctx, b.x, b.y, b.r, b.r * 0.8, 7, b.rot); ctx.fill();
   }
-  // --- Träd: skuggor ---
+  // --- Trees: shadows ---
   ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.30)'; ctx.filter = 'blur(5px)';
   for (const t of env.trees) { ellipse(ctx, t.x + t.r * 0.32, t.y + t.r * 0.42, t.r * 0.95, t.r * 0.82); ctx.fill(); }
   ctx.restore();
-  // --- Träd: kronor ---
+  // --- Trees: crowns ---
   for (const t of env.trees) {
     if (t.type === 'leaf') {
       const g = ctx.createRadialGradient(t.x - t.r * 0.35, t.y - t.r * 0.35, t.r * 0.1, t.x, t.y, t.r);
@@ -362,39 +362,39 @@ function renderWorld(track, env) {
 }
 
 // ============================================================
-//  Bil
+//  Car
 // ============================================================
 function renderCar() {
   const W = 80, H = 48, c = mk(W, H), x = c.getContext('2d');
   x.translate(W / 2, H / 2);
   const rr = (px, py, w, h, r, fill) => { roundRect(x, px, py, w, h, r); x.fillStyle = fill; x.fill(); };
-  // däck
+  // tyres
   for (const [wx, wy] of [[-21, -16], [-21, 10], [12, -16], [12, 10]]) {
     rr(wx, wy, 13, 6, 2, '#141414'); rr(wx + 2, wy + 1.5, 9, 3, 1, '#2d2d2d');
   }
-  // kaross
+  // body
   rr(-28, -13, 56, 26, 8, '#6f0a10');
   const g = x.createLinearGradient(0, -12, 0, 12);
   g.addColorStop(0, '#ff6b5e'); g.addColorStop(0.45, '#dc262d'); g.addColorStop(1, '#951016');
   rr(-27, -12, 54, 24, 7, g);
-  // racingränder
+  // racing stripes
   rr(-27, -4, 54, 8, 2, 'rgba(255,255,255,0.88)');
   rr(-27, -1, 54, 2, 1, 'rgba(0,0,0,0.10)');
-  // kupé
+  // cabin
   const cab = x.createLinearGradient(-14, 0, 12, 0); cab.addColorStop(0, '#182532'); cab.addColorStop(1, '#3c5d7d');
   rr(-14, -9, 26, 18, 5, cab);
-  rr(-8, -8, 10, 16, 2, '#cf2229');            // tak
+  rr(-8, -8, 10, 16, 2, '#cf2229');            // roof
   rr(-8, -2, 10, 4, 1, 'rgba(255,255,255,0.85)');
-  rr(5, -7, 5, 6, 2, 'rgba(255,255,255,0.28)');  // glans
-  // strålkastare / baklyktor
+  rr(5, -7, 5, 6, 2, 'rgba(255,255,255,0.28)');  // gloss
+  // headlights / tail lights
   rr(22, -10, 5, 5, 1.5, '#fff5bd'); rr(22, 5, 5, 5, 1.5, '#fff5bd');
   rr(-28, -10, 3, 5, 1, '#ff453a'); rr(-28, 5, 3, 5, 1, '#ff453a');
-  // vinge
+  // wing
   rr(-30, -13, 3, 3, 1, '#2a2a2e'); rr(-30, 10, 3, 3, 1, '#2a2a2e');
   rr(-34, -15, 6, 30, 2, '#202024'); rr(-33, -14, 2, 28, 1, 'rgba(255,255,255,0.15)');
-  // backspeglar
+  // mirrors
   rr(5, -15, 4, 3, 1, '#9f1016'); rr(5, 12, 4, 3, 1, '#9f1016');
-  // luftintag
+  // air intake
   rr(14, -5, 7, 10, 2, 'rgba(0,0,0,0.35)');
   x.strokeStyle = 'rgba(0,0,0,0.35)'; x.lineWidth = 1; roundRect(x, -27, -12, 54, 24, 7); x.stroke();
   return c;
@@ -420,7 +420,7 @@ function renderMinimap(track, env) {
 }
 
 // ============================================================
-//  Motorljud
+//  Engine sound
 // ============================================================
 const engine = {
   ctx: null, muted: false,
@@ -447,14 +447,14 @@ const engine = {
 };
 
 // ============================================================
-//  Spelscen
+//  Game scene
 // ============================================================
 class RaceScene extends Phaser.Scene {
   constructor() { super('race'); }
   create(data) {
-    // Scenen startas om (scene.restart) vid banbyte; data = { trackIdx, aiOn }
+    // The scene is restarted (scene.restart) on track change; data = { trackIdx, aiOn }
     this.trackIdx = (data && data.trackIdx) || (IS_FILM ? parseInt(FILM.get('track') || '0') : 0); this.switching = false;
-    this.driver = IS_FILM ? FILM.get('driver') : null;   // 'rule' = regelstyrd förare (pure pursuit), bara i filmläge
+    this.driver = IS_FILM ? FILM.get('driver') : null;   // 'rule' = rule-based driver (pure pursuit), film mode only
     this.trackDef = TRACKS[this.trackIdx];
     this.track = buildTrack(this.trackDef.control);
     this.env = buildEnvironment(this.track);
@@ -484,7 +484,7 @@ class RaceScene extends Phaser.Scene {
     }).setDepth(5);
     this.shadow = this.add.image(0, 0, 'carShadow').setAlpha(0.6).setDepth(3);
     this.carSprite = this.add.image(0, 0, 'car').setDepth(4);
-    this.sensorGfx = this.add.graphics().setDepth(6);   // AI:ns strålar (S)
+    this.sensorGfx = this.add.graphics().setDepth(6);   // the AI's rays (S)
     this.showSensors = data && data.showSensors != null ? data.showSensors : ((IS_FILM || IS_REC) ? FILM.get('sensors') === '1' : true);
 
     const cam = this.cameras.main;
@@ -495,7 +495,7 @@ class RaceScene extends Phaser.Scene {
     this.keys = this.input.keyboard.createCursorKeys();
     this.input.keyboard.on('keydown-R', () => this.resetCar());
     this.input.keyboard.on('keydown-M', () => engine.toggle());
-    // AI-förare: nätet laddas från model.json (exporterat av train/export.py)
+    // AI driver: the network is loaded from model.json (exported by train/export.py)
     this.ai = null; this.aiOn = false; this.aiClock = 0; this.aiCmd = { throttle: 0, steer: 0 };
     this.modelIdx = data && data.modelIdx != null ? data.modelIdx : (IS_FILM && FILM.get('model') != null ? parseInt(FILM.get('model')) : MODELS.findIndex(m => m.default));
     if (this.modelIdx < 0) this.modelIdx = 0;
@@ -516,12 +516,12 @@ class RaceScene extends Phaser.Scene {
     this.scene.launch('ui');
   }
 
-  // Ritar det AI:n ser: 7 strålar till asfaltkanten (grön = fritt, röd = kant nära).
-  // I AI-läge används observationen från senaste beslutet, annars räknas den fram för visning.
+  // Draws what the AI sees: 7 rays to the asphalt edge (green = clear, red = edge close).
+  // In AI mode the observation from the latest decision is used, otherwise it is computed for display.
   drawSensors(car, idx) {
     const g = this.sensorGfx; g.clear();
     if (!this.showSensors) return;
-    if (this.driver === 'rule') {   // regelförarens siktpunkt
+    if (this.driver === 'rule') {   // the rule-based driver's aim point
       if (!this.aimPt) return;
       g.lineStyle(2.5, 0xffd60a, 0.9); g.beginPath(); g.moveTo(car.x, car.y); g.lineTo(this.aimPt.x, this.aimPt.y); g.strokePath();
       g.fillStyle(0xffd60a, 1); g.fillCircle(this.aimPt.x, this.aimPt.y, 6); g.lineStyle(2, 0xffffff, 1); g.strokeCircle(this.aimPt.x, this.aimPt.y, 6);
@@ -542,12 +542,12 @@ class RaceScene extends Phaser.Scene {
     });
   }
 
-  // Byt AI-modell (N). Filerna cachas i AI_CACHE; AI-läget behålls.
+  // Switch AI model (N). Files are cached in AI_CACHE; AI mode is kept.
   loadModel(idx, done) {
     const def = MODELS[idx]; this.modelIdx = idx; this.modelDef = def;
     const arm = m => { this.ai = new AiDriver(m, this.track); this.aiCmd = { throttle: 0, steer: 0 }; this.aiClock = AI_DECISION_DT; this.events.emit('model', def); if (done) done(); };
     if (AI_CACHE[def.file]) arm(AI_CACHE[def.file]);
-    else fetch(def.file).then(r => r.json()).then(m => { AI_CACHE[def.file] = m; arm(m); }).catch(e => console.error('kunde inte ladda modell', def.file, e));
+    else fetch(def.file).then(r => r.json()).then(m => { AI_CACHE[def.file] = m; arm(m); }).catch(e => console.error('could not load model', def.file, e));
   }
 
   toggleAi() {
@@ -585,13 +585,13 @@ class RaceScene extends Phaser.Scene {
 
     let throttle, steer;
     if (this.aiOn && this.ai) {
-      // AI:n beslutar 30 ggr/s i speltid (som i träningen), oavsett skärmens bildfrekvens
+      // The AI decides 30 times/s of game time (as in training), regardless of the display's frame rate
       this.aiClock += dt;
       if (this.aiClock >= AI_DECISION_DT - 1e-6) { this.aiClock -= AI_DECISION_DT; this.aiCmd = this.ai.decide(car, idx); }
       throttle = this.aiCmd.throttle; steer = this.aiCmd.steer;
-      if (k.up.isDown || k.down.isDown || k.left.isDown || k.right.isDown) this.toggleAi();   // människan tar över
+      if (k.up.isDown || k.down.isDown || k.left.isDown || k.right.isDown) this.toggleAi();   // the human takes over
     } else if (this.driver === 'rule') {
-      // Pure pursuit, samma som train/baseline.py: sikta 120 px fram, bromsa inför kurvatur
+      // Pure pursuit, same as train/baseline.py: aim 120 px ahead, brake for curvature
       const t = this.track, j = (idx + 12) % t.N, aim = t.pts[j];
       const want = Math.atan2(aim.y - car.y, aim.x - car.x);
       const err = Math.atan2(Math.sin(want - car.rot), Math.cos(want - car.rot));
@@ -614,7 +614,7 @@ class RaceScene extends Phaser.Scene {
     this.drawSensors(car, idx);
     this.shadow.setPosition(car.x + 5, car.y + 7).setRotation(car.rot);
 
-    // effekter
+    // effects
     const speed = Math.hypot(car.vx, car.vy);
     const rx = car.x - fx * 20, ry = car.y - fy * 20;
     const wheels = [[rx - fy * 13, ry + fx * 13], [rx + fy * 13, ry - fx * 13]];
@@ -630,14 +630,14 @@ class RaceScene extends Phaser.Scene {
       for (const [wx, wy] of wheels) if (Math.random() < 0.7) this.dust.emitParticleAt(wx, wy, 1);
     }
 
-    // kamera: framförhållning + zoom
+    // camera: look-ahead + zoom
     const cam = this.cameras.main;
     const frac = Math.min(1, speed / 640);
     this.lookX += (-car.vx * 0.22 - this.lookX) * 0.04; this.lookY += (-car.vy * 0.22 - this.lookY) * 0.04;
     cam.setFollowOffset(this.lookX, this.lookY);
     cam.setZoom(cam.zoom + (BASE_ZOOM * (1 - 0.14 * frac) - cam.zoom) * 0.03);
 
-    // varv
+    // laps
     const N = this.track.N;
     for (let c = 0; c < 2; c++) { const cp = Math.floor(N * (c + 1) / 3); if (Math.abs(idx - cp) < 15) this.visited[c] = true; }
     if (this.lastIdx > N * 0.8 && idx < N * 0.2) {
@@ -659,7 +659,7 @@ class RaceScene extends Phaser.Scene {
 
   collide() {
     const car = this.car;
-    // träd och däckbarriärer
+    // trees and tyre barriers
     for (const t of this.env.obstacles) {
       const dx = car.x - t.x, dy = car.y - t.y, rr = t.cr + CAR_R, d2 = dx * dx + dy * dy;
       if (d2 < rr * rr) {
@@ -668,7 +668,7 @@ class RaceScene extends Phaser.Scene {
         this.bounce(nx, ny);
       }
     }
-    // depåbyggnad (roterad rektangel)
+    // pit building (rotated rectangle)
     const B = this.env.building, ca = Math.cos(-B.ang), sa = Math.sin(-B.ang);
     const dx = car.x - B.cx, dy = car.y - B.cy;
     const lx = dx * ca - dy * sa, ly = dx * sa + dy * ca;
@@ -682,7 +682,7 @@ class RaceScene extends Phaser.Scene {
       car.x += nx * pen; car.y += ny * pen;
       this.bounce(nx, ny);
     }
-    // världskant
+    // world edge
     const m = 24;
     if (car.x < m) { car.x = m; this.bounce(1, 0); } if (car.x > WORLD_W - m) { car.x = WORLD_W - m; this.bounce(-1, 0); }
     if (car.y < m) { car.y = m; this.bounce(0, 1); } if (car.y > WORLD_H - m) { car.y = WORLD_H - m; this.bounce(0, -1); }
@@ -772,11 +772,11 @@ class UIScene extends Phaser.Scene {
 }
 
 // ============================================================
-//  Start
+//  Startup
 // ============================================================
-const AI_CACHE = {};                                                     // modellfil -> laddad JSON
-let MODELS = [{ name: 'Standard', file: 'model.json', status: '', default: true }];   // ersätts av models/index.json
-let TRACKS = [{ name: 'Granskogsbanan', control: CONTROL }];             // ersätts av tracks.json om den finns
+const AI_CACHE = {};                                                     // model file -> loaded JSON
+let MODELS = [{ name: 'Standard', file: 'model.json', status: '', default: true }];   // replaced by models/index.json
+let TRACKS = [{ name: 'Granskogsbanan', control: CONTROL }];             // replaced by tracks.json if present
 let game;
 Promise.all([
   fetch('tracks.json').then(r => r.json()).then(t => { TRACKS = t; }).catch(() => {}),
@@ -792,7 +792,7 @@ Promise.all([
   });
   addEventListener('resize', () => { if (IS_REC) game.scale.refresh(); else game.scale.resize(Math.round(innerWidth * DPR), Math.round(innerHeight * DPR)); });
   if (IS_REC) {
-    // V: spela in canvasen till .webm (MediaRecorder). Indikatorn ligger utanför canvasen och hamnar inte i filmen.
+    // V: record the canvas to .webm (MediaRecorder). The indicator sits outside the canvas and does not end up in the film.
     let rec = null, chunks = [], t0 = 0, timer = null;
     const dot = document.getElementById('recdot'), tm = document.getElementById('rectime');
     const stop = () => { rec.stop(); clearInterval(timer); dot.classList.remove('on'); };
@@ -812,7 +812,7 @@ Promise.all([
     window.addEventListener('keydown', e => { if ((e.key === 'v' || e.key === 'V') && !e.repeat) (rec ? stop : start)(); });
   }
   if (IS_FILM) {
-    // Stoppa requestAnimationFrame-loopen; film/record.mjs stegar spelet själv.
+    // Stop the requestAnimationFrame loop; film/record.mjs steps the game itself.
     let t = 0; const STEP = 1000 / 60;
     const stopper = setInterval(() => { if (game.isRunning && game.loop.running) { game.loop.stop(); clearInterval(stopper); } }, 20);
     window.filmAdvance = n => { for (let i = 0; i < n; i++) { t += STEP; game.step(t, STEP); } };
