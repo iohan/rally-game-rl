@@ -19,7 +19,7 @@ for (const scene of SCENES) {
     const composition = await selectComposition({ serveUrl, id, inputProps: { scene, fmt } });
     const outputLocation = path.join(here, 'out', `${id}.mp4`);
     const t0 = Date.now();
-    await renderMedia({ composition, serveUrl, codec: 'h264', outputLocation, inputProps: { scene, fmt } });
+    await renderMedia({ composition, serveUrl, codec: 'h264', crf: 24, outputLocation, inputProps: { scene, fmt } });   // crf 24: ~10 MB per 30 s
     console.log(`${id}.mp4  ${(composition.durationInFrames / composition.fps).toFixed(1)} s  (${((Date.now() - t0) / 1000).toFixed(0)} s render)`);
   }
 }
