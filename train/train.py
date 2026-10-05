@@ -1,5 +1,5 @@
 """Träna en PPO-agent att köra ett varv.
-  python train.py [steg] [namn] [fixed|random]
+  python train.py [steg] [namn] [fixed|random] [checkpoint-intervall, default 100000]
     fixed  = träna på Granskogsbanan (default)
     random = ny slumpbana varje episod; Granskogsbanan hålls utanför träningen och används bara för eval
 Följ träningen:  tensorboard --logdir runs
@@ -43,6 +43,7 @@ if __name__ == '__main__':
     steps = int(sys.argv[1]) if len(sys.argv) > 1 else 500_000
     name = sys.argv[2] if len(sys.argv) > 2 else time.strftime('ppo_%m%d_%H%M')
     random_track = len(sys.argv) > 3 and sys.argv[3] == 'random'
+    ckpt_every = int(sys.argv[4]) if len(sys.argv) > 4 else 100_000
     out = os.path.join('runs', name); os.makedirs(out, exist_ok=True)
     torch.set_num_threads(2)
 
@@ -58,7 +59,7 @@ if __name__ == '__main__':
     )
     callbacks = [
         StatsCallback(),
-        CheckpointCallback(save_freq=100_000 // N_ENVS, save_path=out, name_prefix='ckpt'),
+        CheckpointCallback(save_freq=ckpt_every // N_ENVS, save_path=out, name_prefix='ckpt'),
         EvalCallback(eval_env, best_model_save_path=out, eval_freq=25_000 // N_ENVS, n_eval_episodes=3, deterministic=True, verbose=0),
     ]
     t0 = time.time()

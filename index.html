@@ -23,7 +23,8 @@
   <h1>🏁 Asfaltsrace</h1>
   <p>Granskogsbanan GP · chikan, hårnål och S-kurvor</p>
   <p><kbd>↑</kbd> gas &nbsp; <kbd>↓</kbd> broms / back &nbsp; <kbd>←</kbd><kbd>→</kbd> sväng</p>
-  <p><kbd>A</kbd> låt AI:n köra &nbsp; <kbd>T</kbd> byt bana &nbsp; <kbd>R</kbd> starta om &nbsp; <kbd>M</kbd> motorljud av/på</p>
+  <p><kbd>A</kbd> låt AI:n köra &nbsp; <kbd>S</kbd> visa AI:ns sensorer &nbsp; <kbd>T</kbd> byt bana</p>
+  <p><kbd>R</kbd> starta om &nbsp; <kbd>M</kbd> motorljud av/på</p>
   <p class="go">Tryck på valfri piltangent för att köra</p>
 </div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
@@ -463,6 +464,8 @@ class RaceScene extends Phaser.Scene {
     }).setDepth(5);
     this.shadow = this.add.image(0, 0, 'carShadow').setAlpha(0.6).setDepth(3);
     this.carSprite = this.add.image(0, 0, 'car').setDepth(4);
+    this.sensorGfx = this.add.graphics().setDepth(6);   // AI:ns strålar (S)
+    this.showSensors = data ? data.showSensors !== false : true;
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, WORLD_W, WORLD_H).setZoom(BASE_ZOOM);
@@ -477,7 +480,8 @@ class RaceScene extends Phaser.Scene {
     const armAi = m => { this.ai = new AiDriver(m, this.track); if (data && data.aiOn) this.toggleAi(); };
     if (AI_MODEL) armAi(AI_MODEL); else fetch('model.json').then(r => r.json()).then(m => { AI_MODEL = m; armAi(m); }).catch(() => {});
     this.input.keyboard.on('keydown-A', e => { if (!e.repeat) this.toggleAi(); });
-    this.input.keyboard.on('keydown-T', e => { if (!e.repeat && !this.switching) { this.switching = true; this.scene.restart({ trackIdx: (this.trackIdx + 1) % TRACKS.length, aiOn: this.aiOn }); } });
+    this.input.keyboard.on('keydown-S', e => { if (!e.repeat) { this.showSensors = !this.showSensors; this.sensorGfx.clear(); } });
+    this.input.keyboard.on('keydown-T', e => { if (!e.repeat && !this.switching) { this.switching = true; this.scene.restart({ trackIdx: (this.trackIdx + 1) % TRACKS.length, aiOn: this.aiOn, showSensors: this.showSensors }); } });
     const overlay = document.getElementById('overlay');
     if (!overlay.classList.contains('hidden')) {
       const first = (e) => { if (e.key && (e.key.startsWith('Arrow') || e.key === 'a' || e.key === 'A')) { overlay.classList.add('hidden'); engine.start(); window.removeEventListener('keydown', first); } };
@@ -487,6 +491,25 @@ class RaceScene extends Phaser.Scene {
     this.car = { x: 0, y: 0, rot: 0, vx: 0, vy: 0, surf: 'asphalt', lat: 0, fwd: 0 };
     this.resetCar();
     this.scene.launch('ui');
+  }
+
+  // Ritar det AI:n ser: 7 strålar till asfaltkanten (grön = fritt, röd = kant nära).
+  // I AI-läge används observationen från senaste beslutet, annars räknas den fram för visning.
+  drawSensors(car, idx) {
+    const g = this.sensorGfx; g.clear();
+    if (!this.showSensors || !this.ai) return;
+    const obs = this.aiOn && this.aiCmd.obs ? this.aiCmd.obs : this.ai.observe(car, idx);
+    this.lastObs = obs;
+    const cfg = this.ai.cfg;
+    cfg.rayAngles.forEach((a, i) => {
+      const f = obs[i], len = f * cfg.rayMax, ang = car.rot + a;
+      const ex = car.x + Math.cos(ang) * len, ey = car.y + Math.sin(ang) * len;
+      const col = Phaser.Display.Color.Interpolate.ColorWithColor({ r: 255, g: 59, b: 48 }, { r: 52, g: 199, b: 89 }, 1, Math.min(1, f * 1.6));
+      const c = Phaser.Display.Color.GetColor(col.r, col.g, col.b);
+      g.lineStyle(2.5, c, 0.85); g.beginPath(); g.moveTo(car.x, car.y); g.lineTo(ex, ey); g.strokePath();
+      g.fillStyle(c, 1); g.fillCircle(ex, ey, 4.5);
+      g.lineStyle(1.5, 0xffffff, 0.9); g.strokeCircle(ex, ey, 4.5);
+    });
   }
 
   toggleAi() {
@@ -541,6 +564,7 @@ class RaceScene extends Phaser.Scene {
 
     // sprites
     this.carSprite.setPosition(car.x, car.y).setRotation(car.rot);
+    this.drawSensors(car, idx);
     this.shadow.setPosition(car.x + 5, car.y + 7).setRotation(car.rot);
 
     // effekter
@@ -647,7 +671,7 @@ class UIScene extends Phaser.Scene {
     this.scale.on('resize', this.layout, this); this.layout();
     this.race.events.on('lap', info => this.flash(info));
     this.race.events.on('reset', () => this.msg.setAlpha(0));
-    const showAi = on => this.aiTxt.setText(on ? '🤖 AI KÖR  ·  A eller piltangent = ta över' : '').setAlpha(on ? 1 : 0);
+    const showAi = on => this.aiTxt.setAlpha(on ? 1 : 0);
     this.race.events.on('ai', showAi); showAi(this.race.aiOn);
   }
   layout() {
@@ -684,6 +708,10 @@ class UIScene extends Phaser.Scene {
     this.speedVal.setText(String(Math.round(spd * 0.35)));
     this.speedUnit.setText('km/h');
     this.surfTxt.setText({ asphalt: 'ASFALT', kerb: 'KANTSTEN', grass: 'GRÄS', gravel: 'GRUS' }[c.surf]);
+    if (r.aiOn) {
+      const a = r.aiCmd, gas = a.throttle > 0 ? 'GAS ▲' : a.throttle < 0 ? 'BROMS ▼' : 'RULLAR', ratt = a.steer < 0 ? '◀ VÄNSTER' : a.steer > 0 ? 'HÖGER ▶' : '▲ RAKT';
+      this.aiTxt.setText(`🤖 AI KÖR   ${gas}   ${ratt}   ·   A = ta över`);
+    }
     this.lapVal.setText(String(r.lap));
     this.timeVal.setText(r.lapStart == null ? '--:--.--' : fmtTime(r.time.now - r.lapStart));
     this.bestVal.setText(fmtTime(r.best));
