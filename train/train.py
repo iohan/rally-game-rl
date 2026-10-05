@@ -1,8 +1,8 @@
-"""Träna en PPO-agent att köra ett varv.
-  python train.py [steg] [namn] [fixed|random] [checkpoint-intervall, default 100000]
-    fixed  = träna på Granskogsbanan (default)
-    random = ny slumpbana varje episod; Granskogsbanan hålls utanför träningen och används bara för eval
-Följ träningen:  tensorboard --logdir runs
+"""Train a PPO agent to drive one lap.
+  python train.py [steps] [name] [fixed|random] [checkpoint interval, default 100000]
+    fixed  = train on Granskogsbanan (default)
+    random = new random track every episode; Granskogsbanan is kept out of training and used only for eval
+Follow training:  tensorboard --logdir runs
 """
 import os, sys, time
 import numpy as np
@@ -23,7 +23,7 @@ def make_env(seed, random_start=True, random_track=False):
 
 
 class StatsCallback(BaseCallback):
-    """Skriver varv/avåkningar per 100 episoder till TensorBoard och terminalen."""
+    """Logs laps/run-offs per 100 episodes to TensorBoard and the terminal."""
     def __init__(self):
         super().__init__(); self.eps = []
     def _on_step(self):
@@ -35,7 +35,7 @@ class StatsCallback(BaseCallback):
                     self.logger.record('race/lap_rate', e[:, 0].mean())
                     self.logger.record('race/off_rate', e[:, 1].mean())
                     self.logger.record('race/progress_px', e[:, 2].mean())
-                    print(f"[{self.num_timesteps:>8}] senaste 100 ep: varv {e[:,0].mean()*100:3.0f}%  av banan {e[:,1].mean()*100:3.0f}%  framsteg {e[:,2].mean():5.0f} px  reward {e[:,3].mean():6.1f}", flush=True)
+                    print(f"[{self.num_timesteps:>8}] last 100 ep: laps {e[:,0].mean()*100:3.0f}%  off track {e[:,1].mean()*100:3.0f}%  progress {e[:,2].mean():5.0f} px  reward {e[:,3].mean():6.1f}", flush=True)
         return True
 
 
@@ -48,7 +48,7 @@ if __name__ == '__main__':
     torch.set_num_threads(2)
 
     venv = SubprocVecEnv([make_env(i, random_track=random_track) for i in range(N_ENVS)])
-    eval_env = DummyVecEnv([make_env(1000, random_start=False)])   # utvärdering: från startlinjen
+    eval_env = DummyVecEnv([make_env(1000, random_start=False)])   # evaluation: from the start line
 
     model = PPO(
         'MlpPolicy', venv,
@@ -65,4 +65,4 @@ if __name__ == '__main__':
     t0 = time.time()
     model.learn(total_timesteps=steps, callback=callbacks, tb_log_name=name)
     model.save(os.path.join(out, 'final'))
-    print(f"klart ({'slumpbanor' if random_track else 'Granskogsbanan'}): {steps} steg på {(time.time()-t0)/60:.1f} min -> {out}/final.zip (bästa enligt eval: {out}/best_model.zip)")
+    print(f"done ({'random tracks' if random_track else 'Granskogsbanan'}): {steps} steps in {(time.time()-t0)/60:.1f} min -> {out}/final.zip (best by eval: {out}/best_model.zip)")

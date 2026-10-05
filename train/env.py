@@ -1,20 +1,20 @@
-"""Gymnasium-miljö: en bil på Granskogsbanan.
+"""Gymnasium environment: one car on Granskogsbanan.
 
-Observation (14 tal, ungefär -1..1):
-  [0..6]  7 strålar: avstånd till asfaltkant i -60,-40,-20,0,20,40,60 grader (0 = kant intill, 1 = >= RAY_MAX px fri asfalt)
-  [7]     fart framåt / 640
-  [8]     sidoglid lat / 300
-  [9]     sidoposition från mittlinjen / HALF_W (-1 vänsterkant, +1 högerkant)
-  [10]    riktningsfel mot banans tangent / pi
-  [11..13] kurvatur 10, 25, 50 punkter (100, 250, 500 px) framåt, * 380 (så ~±1 i hårda kurvor)
+Observation (14 numbers, roughly -1..1):
+  [0..6]  7 rays: distance to the asphalt edge at -60,-40,-20,0,20,40,60 degrees (0 = edge right here, 1 = >= RAY_MAX px of free asphalt)
+  [7]     forward speed / 640
+  [8]     lateral slip lat / 300
+  [9]     lateral position from the centre line / HALF_W (-1 left edge, +1 right edge)
+  [10]    heading error vs. the track tangent / pi
+  [11..13] curvature 10, 25, 50 points (100, 250, 500 px) ahead, * 380 (so ~±1 in hard corners)
 
 Action: Discrete(9) = throttle {-1,0,1} x steer {-1,0,1}
 
-Reward per steg:
-  + framsteg längs banan i px * R_PROGRESS
-  - R_TIME varje steg (annars är "stå still" riskfritt)
-  - R_OFF och episoden slutar om bilen lämnar asfalten
-  + R_LAP och episoden slutar när ett varv är klart
+Reward per step:
+  + progress along the track in px * R_PROGRESS
+  - R_TIME every step (otherwise standing still is risk-free)
+  - R_OFF and the episode ends if the car leaves the asphalt
+  + R_LAP and the episode ends when a lap is completed
 """
 import math
 import numpy as np
@@ -25,16 +25,16 @@ from tracks import make_random_track
 
 RAY_ANGLES = np.deg2rad([-60, -40, -20, 0, 20, 40, 60])
 RAY_MAX = 400.0          # px
-RAY_STEP = 8.0           # px per sampel längs strålen
-LOOKAHEAD = (10, 25, 50) # index framåt för kurvatur
+RAY_STEP = 8.0           # px per sample along the ray
+LOOKAHEAD = (10, 25, 50) # indices ahead for curvature
 ACTIONS = [(t, s) for t in (-1, 0, 1) for s in (-1, 0, 1)]   # (throttle, steer)
 
 DT = 1 / 60
-FRAME_SKIP = 2           # 2 fysiksteg per beslut = 30 beslut/s
+FRAME_SKIP = 2           # 2 physics steps per decision = 30 decisions/s
 MAX_STEPS = 3000         # 100 s
-STALL_STEPS = 90         # 3 s utan framsteg = avbryt
+STALL_STEPS = 90         # 3 s without progress = abort
 
-R_PROGRESS = 0.01        # per px -> ~97 för ett varv
+R_PROGRESS = 0.01        # per px -> ~97 for one lap
 R_TIME = 0.01
 R_OFF = 10.0
 R_LAP = 50.0
@@ -44,7 +44,7 @@ class RaceEnv(gym.Env):
     metadata = {'render_modes': []}
 
     def __init__(self, random_start=True, allow_kerb=False, seed=None, track=None, random_track=False):
-        """track: Track-objekt (default Granskogsbanan). random_track: ny slumpbana varje episod."""
+        """track: Track object (default Granskogsbanan). random_track: new random track every episode."""
         super().__init__()
         self.track = track or Track()
         self.random_track = random_track
@@ -56,14 +56,14 @@ class RaceEnv(gym.Env):
         self.car = Car()
         self.idx = 0
 
-    # ---------- hjälp ----------
+    # ---------- helpers ----------
     def _place(self, idx, lat_off=0.0, ang_off=0.0):
         t = self.track
         self.car = Car(t.x[idx] + t.nx[idx] * lat_off, t.y[idx] + t.ny[idx] * lat_off, t.ang[idx] + ang_off)
         self.idx = idx
 
     def _ray(self, ang):
-        """Avstånd längs strålen tills mittlinjeavståndet > HALF_W (asfaltkanten)."""
+        """Distance along the ray until the centre-line distance > HALF_W (edge of the asphalt)."""
         t = self.track; c = self.car
         n = int(RAY_MAX / RAY_STEP)
         ds = np.arange(1, n + 1) * RAY_STEP
@@ -83,7 +83,7 @@ class RaceEnv(gym.Env):
         o = np.array(rays + [c.fwd / 640, c.lat / 300, lat_off, head_err] + curv, dtype=np.float32)
         return np.clip(o, -1, 1)
 
-    # ---------- gym-api ----------
+    # ---------- gym API ----------
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         if seed is not None: self.rng = np.random.default_rng(seed)
@@ -92,7 +92,7 @@ class RaceEnv(gym.Env):
         idx = int(self.rng.integers(t.N)) if self.random_start else t.N - START_IDX_FROM_END
         self._place(idx, self.rng.uniform(-30, 30), self.rng.uniform(-0.2, 0.2))
         self.start_idx = idx
-        self.progress = 0.0      # index-framsteg ackumulerat (float)
+        self.progress = 0.0      # accumulated index progress (float)
         self.steps = 0
         self.stall = 0
         self.dist = 0.0
@@ -101,12 +101,12 @@ class RaceEnv(gym.Env):
     def step(self, action):
         throttle, steer = ACTIONS[int(action)]
         t = self.track; c = self.car
-        idx0 = self.idx                      # index före steget (framsteget mäts över hela beslutet)
+        idx0 = self.idx                      # index before the step (progress is measured over the whole decision)
         for _ in range(FRAME_SKIP):
             self.idx, self.dist = t.nearest_local(c.x, c.y, self.idx)
             step_car(c, throttle, steer, DT, SURF[t.surface_dist(self.dist)])
         new_idx, self.dist = t.nearest_local(c.x, c.y, self.idx)
-        d_idx = (new_idx - idx0 + t.N // 2) % t.N - t.N // 2   # wrap-säker skillnad
+        d_idx = (new_idx - idx0 + t.N // 2) % t.N - t.N // 2   # wrap-safe difference
         self.idx = new_idx
         self.progress += d_idx
         self.steps += 1

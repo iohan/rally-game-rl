@@ -1,5 +1,5 @@
-"""Utvärdera en modell på banor den inte tränat på.
-python evaluate_tracks.py runs/run3/best_model.zip [antal_slumpbanor]"""
+"""Evaluate a model on tracks it has not trained on.
+python evaluate_tracks.py runs/run3/best_model.zip [number_of_random_tracks]"""
 import sys
 import numpy as np
 from stable_baselines3 import PPO
@@ -17,12 +17,12 @@ def run(track, seed):
         o, r, term, trunc, info = e.step(a)
         if term or trunc: return info['lap'], info['progress_px'] / track.total, e.steps / 30
 
-print(f"{'bana':16s} {'längd':>6s} {'minradie':>8s} {'varv':>5s} {'framsteg':>8s} {'tid':>6s}")
+print(f"{'track':16s} {'length':>6s} {'min_rad':>8s} {'laps':>5s} {'progress':>8s} {'time':>6s}")
 for name, ctrl in TEST_TRACKS.items():
     t = Track(ctrl); res = [run(t, s) for s in range(5)]
     print(f"{name:16s} {t.total:6.0f} {1/np.abs(t.curv).max():8.0f} {sum(r[0] for r in res):>3d}/5 {np.mean([r[1] for r in res])*100:7.0f}% {np.mean([r[2] for r in res]):5.1f}s")
-rng = np.random.default_rng(999)   # andra frön än träningen (0..7) och tracks.json (11,22,33)
+rng = np.random.default_rng(999)   # different seeds from training (0..7) and tracks.json (11,22,33)
 res = []
 for i in range(n_rand):
     t = make_random_track(rng); res.append(run(t, i))
-print(f"{'nya slumpbanor':16s} {'':>6s} {'':>8s} {sum(r[0] for r in res):>3d}/{n_rand} {np.mean([r[1] for r in res])*100:7.0f}%")
+print(f"{'new random tracks':16s} {'':>6s} {'':>8s} {sum(r[0] for r in res):>3d}/{n_rand} {np.mean([r[1] for r in res])*100:7.0f}%")

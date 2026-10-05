@@ -1,4 +1,4 @@
-"""Jämför Python-porten mot sim.js tal för tal. Kräver node."""
+"""Compare the Python port against sim.js number by number. Requires node."""
 import json, subprocess, os, math
 import numpy as np
 from sim import Track, Car, step_car, SURF, HALF_W, KERB_W, START_IDX_FROM_END
@@ -18,9 +18,9 @@ for i, row in enumerate(js['traj']):
     steer = 0 if i < 150 else (1 if i < 300 else (-1 if i < 350 else 0))
     idx, dist = t.nearest_local(car.x, car.y, idx)
     gi, gd = t.nearest(car.x, car.y)
-    assert idx == gi, f"local nearest {idx} != global {gi} vid steg {i}"
-    assert idx == row[5], f"idx {idx} != js {row[5]} vid steg {i}"
+    assert idx == gi, f"local nearest {idx} != global {gi} at step {i}"
+    assert idx == row[5], f"idx {idx} != js {row[5]} at step {i}"
     step_car(car, throttle, steer, 1 / 60, SURF[t.surface_dist(dist)])
     worst = max(worst, abs(car.x - row[0]), abs(car.y - row[1]), abs(car.rot - row[2]), abs(car.vx - row[3]), abs(car.vy - row[4]))
-print(f"600 steg, max avvikelse bil-tillstånd: {worst:.2e}")
-print("OK" if worst < 1e-6 else "FEL: porten avviker")
+print(f"600 steps, max deviation in car state: {worst:.2e}")
+print("OK" if worst < 1e-6 else "ERROR: the port deviates")

@@ -1,12 +1,12 @@
-"""Python-port av sim.js: bana + bilfysik. Måste ge samma tal som JS-versionen.
-Verifiera med: python check_sim.py
+"""Python port of sim.js: track + car physics. Must produce the same numbers as the JS version.
+Verify with: python check_sim.py
 """
 import math
 import numpy as np
 
 WORLD_W, WORLD_H = 4200, 3000
-HALF_W = 80           # halva vägbredden (asfalt)
-KERB_W = 18           # kantsten
+HALF_W = 80           # half road width (asphalt)
+KERB_W = 18           # kerb width
 CAR_R = 16
 TAU = math.pi * 2
 
@@ -51,7 +51,7 @@ def cr(p0, p1, p2, p3, t):
 
 
 class Track:
-    """Mittlinje som ~10 px-samplade punkter. Attribut som numpy-arrayer av längd N."""
+    """Centre line sampled every ~10 px. Attributes are numpy arrays of length N."""
 
     def __init__(self, control=None):
         control = CONTROL if control is None else control
@@ -86,20 +86,20 @@ class Track:
         self.curv = np.array([sum(raw_curv[(k + w) % N] for w in range(-4, 5)) / 9 for k in range(N)])
 
     def nearest(self, x, y):
-        """Global sökning (långsam, O(N)). Samma som JS."""
+        """Global search (slow, O(N)). Same as the JS version."""
         d2 = (self.x - x) ** 2 + (self.y - y) ** 2
         i = int(np.argmin(d2))
         return i, math.sqrt(d2[i])
 
     def nearest_local(self, x, y, hint, win=30):
-        """Sök bara ±win index runt senaste kända index. Snabbt; bilen rör sig max ~2 index/steg."""
+        """Search only ±win indices around the last known index. Fast; the car moves at most ~2 indices per step."""
         idx = (np.arange(hint - win, hint + win + 1)) % self.N
         d2 = (self.x[idx] - x) ** 2 + (self.y[idx] - y) ** 2
         j = int(np.argmin(d2))
         return int(idx[j]), math.sqrt(d2[j])
 
     def surface_dist(self, dist):
-        """Underlag utifrån avstånd till mittlinjen (grus ignoreras: utanför kantsten = gräs)."""
+        """Surface from distance to the centre line (gravel ignored: beyond the kerb = grass)."""
         if dist <= HALF_W: return 'asphalt'
         if dist <= HALF_W + KERB_W: return 'kerb'
         return 'grass'
@@ -114,7 +114,7 @@ class Car:
 
 
 def step_car(car, throttle, steer, dt, S):
-    """Exakt port av stepCar i sim.js."""
+    """Exact port of stepCar in sim.js."""
     fwd0 = car.vx * math.cos(car.rot) + car.vy * math.sin(car.rot)
     sf = min(1.0, abs(fwd0) / 200)
     hs = 1 - 0.45 * min(1.0, abs(fwd0) / 640)

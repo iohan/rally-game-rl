@@ -1,5 +1,5 @@
-"""Exportera flera checkpoints till ../models/ + index.json så spelet kan växla modell (tangent N).
-Varje modell körs en gång från startlinjen på Granskogsbanan så index.json får varvstatus."""
+"""Export several checkpoints to ../models/ + index.json so the game can switch model (key N).
+Each model is run once from the start line on Granskogsbanan so index.json gets a lap status."""
 import os, json
 from export import policy_to_json
 from env import RaceEnv
@@ -29,4 +29,4 @@ for name, src, fid in MODELS:
     index.append({'name': name, 'file': f'models/{fid}.json', 'status': status, 'default': fid == 'slump_2M'})
     print(f"{name:26s} {status}")
 json.dump(index, open('../models/index.json', 'w'), ensure_ascii=False, indent=1)
-print('skrev ../models/index.json')
+print('wrote ../models/index.json')

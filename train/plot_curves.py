@@ -1,7 +1,7 @@
-"""Rita träningskurvor från TensorBoard-loggarna (för filmning).
-  python plot_curves.py runs/run5_1 "Granskogsbanan" runs/run4_2 "Slumpbanor"
-Skriver curves.png (stillbild) och curves.gif (kurvan växer fram, 10 s).
-Live-alternativ under träning:  tensorboard --logdir runs --reload_interval 5
+"""Plot training curves from the TensorBoard logs (for filming).
+  python plot_curves.py runs/run5_1 "Single track" runs/run4_2 "Random tracks"
+Writes curves.png (still) and curves.gif (the curve grows over 10 s).
+Live alternative during training:  tensorboard --logdir runs --reload_interval 5
 """
 import sys
 import numpy as np
@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, PillowWriter
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
-TAGS = [('race/lap_rate', 'Andel episoder med fullt varv'), ('race/off_rate', 'Andel avåkningar'), ('rollout/ep_rew_mean', 'Reward per episod (snitt)')]
-args = sys.argv[1:] or ['runs/run5_1', 'Granskogsbanan', 'runs/run4_2', 'Slumpbanor']
+TAGS = [('race/lap_rate', 'Share of episodes with a full lap'), ('race/off_rate', 'Share of run-offs'), ('rollout/ep_rew_mean', 'Reward per episode (mean)')]
+args = sys.argv[1:] or ['runs/run5_1', 'Single track', 'runs/run4_2', 'Random tracks']
 runs = [(args[i], args[i + 1]) for i in range(0, len(args), 2)]
 
 data = {}
@@ -29,14 +29,14 @@ for ax, (tag, title) in zip(axes, TAGS):
         x, y = data[label][tag]
         (ln,) = ax.plot(x / 1000, y, lw=2.2, label=label)
         lines[(label, tag)] = (ln, x / 1000, y)
-    ax.set_title(title); ax.set_xlabel('träningssteg (tusental)'); ax.grid(alpha=0.3)
+    ax.set_title(title); ax.set_xlabel('training steps (thousands)'); ax.grid(alpha=0.3)
     if 'rate' in tag: ax.set_ylim(-0.02, 1.02)
 axes[0].legend(loc='lower right')
 fig.tight_layout()
 fig.savefig('curves.png', dpi=150)
-print('skrev curves.png')
+print('wrote curves.png')
 
-# GIF: kurvorna ritas fram vänster -> höger
+# GIF: the curves are drawn left -> right
 xmax = max(x.max() for (_, x, _) in lines.values())
 for ax in axes: ax.set_xlim(0, xmax * 1.02)
 frames = 300
@@ -47,4 +47,4 @@ def update(i):
     return [ln for ln, _, _ in lines.values()]
 anim = FuncAnimation(fig, update, frames=frames, blit=True)
 anim.save('curves.gif', writer=PillowWriter(fps=30), dpi=80)
-print('skrev curves.gif')
+print('wrote curves.gif')

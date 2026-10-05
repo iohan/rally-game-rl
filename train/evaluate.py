@@ -1,4 +1,4 @@
-"""Kör en sparad modell från startlinjen och rapportera. python evaluate.py runs/<namn>/best_model.zip [antal]"""
+"""Run a saved model from the start line and report. python evaluate.py runs/<name>/best_model.zip [episodes]"""
 import sys
 import numpy as np
 from stable_baselines3 import PPO
@@ -13,4 +13,4 @@ for ep in range(n):
         a, _ = model.predict(o, deterministic=True)
         o, r, term, trunc, info = env.step(a); total += r; steps += 1
         if term or trunc: break
-    print(f"ep {ep}: varv={info['lap']}  av_banan={info['off']}  framsteg={info['progress_px']:.0f} px  tid={steps/30:.1f} s  reward={total:.1f}")
+    print(f"ep {ep}: lap={info['lap']}  off_track={info['off']}  progress={info['progress_px']:.0f} px  time={steps/30:.1f} s  reward={total:.1f}")

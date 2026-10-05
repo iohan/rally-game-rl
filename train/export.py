@@ -1,13 +1,13 @@
-"""Exportera PPO-policyn till JSON som ai.js kan läsa.
+"""Export the PPO policy to JSON that ai.js can read.
 python export.py runs/run1/best_model.zip ../model.json
-Skriver även en referensbana (traj) så check_ai.js kan verifiera JS-implementationen."""
+Also writes a reference trajectory (traj) so check_ai.js can verify the JS implementation."""
 import sys, json
 import numpy as np
 from stable_baselines3 import PPO
 from env import RaceEnv, RAY_ANGLES, RAY_MAX, RAY_STEP, LOOKAHEAD, ACTIONS
 
 def policy_to_json(src):
-    """PPO-zip -> dict med lager + observationskonfig (det ai.js läser)."""
+    """PPO zip -> dict with layers + observation config (what ai.js reads)."""
     m = PPO.load(src, device='cpu')
     sd = {k: v.numpy().tolist() for k, v in m.policy.state_dict().items()}
     layers = [
@@ -30,9 +30,9 @@ else:
     m, model = policy_to_json(src)
     json.dump(model, open(dst, 'w'))
     n = sum(len(l['b']) * (len(l['W'][0]) + 1) for l in model['layers'])
-    print(f"skrev {dst}: {len(model['layers'])} lager, {n} vikter")
+    print(f"wrote {dst}: {len(model['layers'])} layers, {n} weights")
 
-    # referensbana för check_ai.js: startläge + (obs, action) per steg
+    # reference trajectory for check_ai.js: start state + (obs, action) per step
     env = RaceEnv(random_start=False, seed=123)
     o, _ = env.reset()
     ref = {'start': {'x': env.car.x, 'y': env.car.y, 'rot': env.car.rot, 'idx': env.idx}, 'steps': []}
@@ -43,4 +43,4 @@ else:
         if term or trunc: break
     ref['lap'] = bool(info['lap'])
     json.dump(ref, open('ai_ref.json', 'w'))
-    print(f"referens: {len(ref['steps'])} steg, varv={ref['lap']}")
+    print(f"reference: {len(ref['steps'])} steps, lap={ref['lap']}")
