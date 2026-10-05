@@ -1,0 +1,8 @@
+/Users/johost/development/sandbox/rally-game/.claude/worktrees/ai-car-driving-training-12021e/train/.venv/lib/python3.12/site-packages/stable_baselines3/common/callbacks.py:419: UserWarning: Training and eval env are not of the same type<stable_baselines3.common.vec_env.subproc_vec_env.SubprocVecEnv object at 0x10d05d820> != <stable_baselines3.common.vec_env.dummy_vec_env.DummyVecEnv object at 0x10fad73b0>
+  warnings.warn("Training and eval env are not of the same type" f"{self.training_env} != {self.eval_env}")
+[   34992] senaste 100 ep: varv   0%  av banan  44%  framsteg   150 px  reward  -11.8
+[   76088] senaste 100 ep: varv   0%  av banan  19%  framsteg   361 px  reward  -10.5
+[  220960] senaste 100 ep: varv  70%  av banan  21%  framsteg  8060 px  reward   98.6
+[  353184] senaste 100 ep: varv  92%  av banan   8%  framsteg  9314 px  reward  124.8
+[  486872] senaste 100 ep: varv  95%  av banan   5%  framsteg  9494 px  reward  128.7
+klart: 500000 steg på 1.0 min -> runs/run1/final.zip (bästa enligt eval: runs/run1/best_model.zip)
