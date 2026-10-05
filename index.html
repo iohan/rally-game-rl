@@ -38,10 +38,11 @@
 // Bana, underlag och bilfysik ligger i sim.js (delas med träningen)
 // Filmläge (film/record.mjs): ?film=1&track=0&model=8&ai=1&sensors=1&driver=rule&zoom=1.2&ui=1.4
 // Spelloopen stoppas och stegas via window.filmAdvance(n) så varje frame blir deterministisk.
-// ui = HUD-skala (canvasen blir ui gånger större än fönstret och skalas ner vid inspelningen).
+// ui = HUD-skala i filmläge (större text för sociala medier).
 const FILM = new URLSearchParams(location.search);
 const IS_FILM = FILM.get('film') === '1';
-const DPR = IS_FILM ? parseFloat(FILM.get('ui') || '1') : Math.min(window.devicePixelRatio || 1, 2);
+const DPR = IS_FILM ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+const UI_SCALE = IS_FILM ? parseFloat(FILM.get('ui') || '1') : DPR;   // HUD:ens skala
 const BASE_ZOOM = 0.9 * DPR * (IS_FILM ? parseFloat(FILM.get('zoom') || '1') : 1);
 
 
@@ -689,7 +690,7 @@ class UIScene extends Phaser.Scene {
   create() {
     this.race = this.scene.get('race');
     const font = '"Avenir Next","Segoe UI",Helvetica,Arial,sans-serif';
-    const T = (size, color, weight = '600') => this.add.text(0, 0, '', { fontFamily: font, fontSize: Math.round(size * DPR) + 'px', color, fontStyle: weight }).setShadow(0, 2 * DPR, 'rgba(0,0,0,0.55)', 4 * DPR, false, true);
+    const T = (size, color, weight = '600') => this.add.text(0, 0, '', { fontFamily: font, fontSize: Math.round(size * UI_SCALE) + 'px', color, fontStyle: weight }).setShadow(0, 2 * UI_SCALE, 'rgba(0,0,0,0.55)', 4 * UI_SCALE, false, true);
     this.bg = this.add.graphics();
     this.lapLbl = T(11, '#cfd8c3'); this.lapVal = T(26, '#ffffff', '700');
     this.timeLbl = T(11, '#cfd8c3'); this.timeVal = T(26, '#ffffff', '700');
@@ -700,8 +701,8 @@ class UIScene extends Phaser.Scene {
     this.aiTxt = T(13, '#ffd60a', '700').setOrigin(0.5).setAlpha(0);
     this.trackTxt = T(12, '#cfd8c3');
     this.modelTxt = T(12, '#cfd8c3');
-    this.mm = this.add.image(0, 0, 'minimap').setOrigin(0, 0).setScale(DPR);
-    this.dot = this.add.image(0, 0, 'dot').setTint(0xff3b30).setScale(0.55 * DPR);
+    this.mm = this.add.image(0, 0, 'minimap').setOrigin(0, 0).setScale(UI_SCALE);
+    this.dot = this.add.image(0, 0, 'dot').setTint(0xff3b30).setScale(0.55 * UI_SCALE);
     this.scale.on('resize', this.layout, this); this.layout();
     this.race.events.on('lap', info => this.flash(info));
     this.race.events.on('reset', () => this.msg.setAlpha(0));
@@ -712,7 +713,7 @@ class UIScene extends Phaser.Scene {
     this.race.events.on('model', showModel); if (this.race.modelDef) showModel(this.race.modelDef);
   }
   layout() {
-    const w = this.scale.width, h = this.scale.height, u = DPR, p = 16 * u;
+    const w = this.scale.width, h = this.scale.height, u = UI_SCALE, p = 16 * u;
     this.bg.clear(); this.bg.fillStyle(0x000000, 0.42);
     this.bg.fillRoundedRect(p, p, 318 * u, 74 * u, 12 * u);
     const cols = [p + 16 * u, p + 96 * u, p + 206 * u];
@@ -757,8 +758,8 @@ class UIScene extends Phaser.Scene {
     this.lapVal.setText(String(r.lap));
     this.timeVal.setText(r.lapStart == null ? '--:--.--' : fmtTime(r.time.now - r.lapStart));
     this.bestVal.setText(fmtTime(r.best));
-    const s = r.mmScale * DPR;
-    this.dot.setPosition(this.mmX + 10 * DPR + c.x * s, this.mmY + 10 * DPR + c.y * s);
+    const s = r.mmScale * UI_SCALE;
+    this.dot.setPosition(this.mmX + 10 * UI_SCALE + c.x * s, this.mmY + 10 * UI_SCALE + c.y * s);
   }
 }
 

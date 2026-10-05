@@ -4,7 +4,7 @@
 // Banor enligt tracks.json: 0=Granskogsbanan 1=Tallmon 2=Spegelbanan 3=Ovalen 4-6=slumpbanor
 export const FPS = 30;
 export const FORMATS = [
-  { id: '16x9', width: 1920, height: 1080, zoom: 1.0, ui: 1.4 },   // ui = HUD-skala
+  { id: '16x9', width: 1920, height: 1080, zoom: 1.2, ui: 1.4 },   // ui = HUD-skala
   { id: '1x1', width: 1080, height: 1080, zoom: 0.85, ui: 1.0 },
 ];
 
