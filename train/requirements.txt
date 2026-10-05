@@ -3,3 +3,4 @@ gymnasium
 stable-baselines3>=2.3
 torch
 tensorboard
+matplotlib
