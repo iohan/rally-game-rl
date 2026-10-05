@@ -97,11 +97,12 @@ class RaceEnv(gym.Env):
     def step(self, action):
         throttle, steer = ACTIONS[int(action)]
         t = self.track; c = self.car
+        idx0 = self.idx                      # index före steget (framsteget mäts över hela beslutet)
         for _ in range(FRAME_SKIP):
             self.idx, self.dist = t.nearest_local(c.x, c.y, self.idx)
             step_car(c, throttle, steer, DT, SURF[t.surface_dist(self.dist)])
         new_idx, self.dist = t.nearest_local(c.x, c.y, self.idx)
-        d_idx = (new_idx - self.idx + t.N // 2) % t.N - t.N // 2   # wrap-säker skillnad
+        d_idx = (new_idx - idx0 + t.N // 2) % t.N - t.N // 2   # wrap-säker skillnad
         self.idx = new_idx
         self.progress += d_idx
         self.steps += 1

@@ -23,11 +23,12 @@
   <h1>🏁 Asfaltsrace</h1>
   <p>Granskogsbanan GP · chikan, hårnål och S-kurvor</p>
   <p><kbd>↑</kbd> gas &nbsp; <kbd>↓</kbd> broms / back &nbsp; <kbd>←</kbd><kbd>→</kbd> sväng</p>
-  <p><kbd>R</kbd> starta om &nbsp; <kbd>M</kbd> motorljud av/på</p>
+  <p><kbd>A</kbd> låt AI:n köra &nbsp; <kbd>R</kbd> starta om &nbsp; <kbd>M</kbd> motorljud av/på</p>
   <p class="go">Tryck på valfri piltangent för att köra</p>
 </div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
 <script src="sim.js"></script>
+<script src="ai.js"></script>
 <script>
 'use strict';
 // ============================================================
@@ -456,7 +457,11 @@ class RaceScene extends Phaser.Scene {
     this.keys = this.input.keyboard.createCursorKeys();
     this.input.keyboard.on('keydown-R', () => this.resetCar());
     this.input.keyboard.on('keydown-M', () => engine.toggle());
-    const first = (e) => { if (e.key && e.key.startsWith('Arrow')) { document.getElementById('overlay').classList.add('hidden'); engine.start(); window.removeEventListener('keydown', first); } };
+    // AI-förare: nätet laddas från model.json (exporterat av train/export.py)
+    this.ai = null; this.aiOn = false; this.aiClock = 0; this.aiCmd = { throttle: 0, steer: 0 };
+    fetch('model.json').then(r => r.json()).then(m => { this.ai = new AiDriver(m, this.track); }).catch(() => {});
+    this.input.keyboard.on('keydown-A', () => this.toggleAi());
+    const first = (e) => { if (e.key && (e.key.startsWith('Arrow') || e.key === 'a' || e.key === 'A')) { document.getElementById('overlay').classList.add('hidden'); engine.start(); window.removeEventListener('keydown', first); } };
     window.addEventListener('keydown', first);
 
     this.car = { x: 0, y: 0, rot: 0, vx: 0, vy: 0, surf: 'asphalt', lat: 0, fwd: 0 };
@@ -464,7 +469,14 @@ class RaceScene extends Phaser.Scene {
     this.scene.launch('ui');
   }
 
+  toggleAi() {
+    if (!this.ai) return;
+    this.aiOn = !this.aiOn; this.aiClock = AI_DECISION_DT;
+    this.events.emit('ai', this.aiOn);
+  }
+
   resetCar() {
+    this.aiClock = AI_DECISION_DT;
     const p = this.track.pts[this.track.N - START_IDX_FROM_END];
     Object.assign(this.car, { x: p.x, y: p.y, rot: p.ang, vx: 0, vy: 0, lat: 0, fwd: 0 });
     this.lap = 0; this.lapStart = null; this.best = null; this.visited = [false, false];
@@ -487,11 +499,20 @@ class RaceScene extends Phaser.Scene {
   update(time, delta) {
     const dt = Math.min(delta / 1000, 0.05);
     const k = this.keys, car = this.car;
-    const throttle = k.up.isDown ? 1 : k.down.isDown ? -1 : 0;
-    const steer = (k.left.isDown ? -1 : 0) + (k.right.isDown ? 1 : 0);
-
     const { surf, idx } = this.surfaceAt(car.x, car.y);
     const S = SURF[surf]; car.surf = surf;
+
+    let throttle, steer;
+    if (this.aiOn && this.ai) {
+      // AI:n beslutar 30 ggr/s i speltid (som i träningen), oavsett skärmens bildfrekvens
+      this.aiClock += dt;
+      if (this.aiClock >= AI_DECISION_DT - 1e-6) { this.aiClock -= AI_DECISION_DT; this.aiCmd = this.ai.decide(car, idx); }
+      throttle = this.aiCmd.throttle; steer = this.aiCmd.steer;
+      if (k.up.isDown || k.down.isDown || k.left.isDown || k.right.isDown) this.toggleAi();   // människan tar över
+    } else {
+      throttle = k.up.isDown ? 1 : k.down.isDown ? -1 : 0;
+      steer = (k.left.isDown ? -1 : 0) + (k.right.isDown ? 1 : 0);
+    }
 
     stepCar(car, throttle, steer, dt, S);
     const fx = Math.cos(car.rot), fy = Math.sin(car.rot), fwd = car.fwd, lat = car.lat;
@@ -599,11 +620,13 @@ class UIScene extends Phaser.Scene {
     this.speedVal = T(46, '#ffffff', '800'); this.speedUnit = T(13, '#cfd8c3');
     this.surfTxt = T(11, '#cfd8c3');
     this.msg = T(22, '#ffffff', '700').setOrigin(0.5).setAlpha(0);
+    this.aiTxt = T(13, '#ffd60a', '700').setOrigin(0.5).setAlpha(0);
     this.mm = this.add.image(0, 0, 'minimap').setOrigin(0, 0).setScale(DPR);
     this.dot = this.add.image(0, 0, 'dot').setTint(0xff3b30).setScale(0.55 * DPR);
     this.scale.on('resize', this.layout, this); this.layout();
     this.race.events.on('lap', info => this.flash(info));
     this.race.events.on('reset', () => this.msg.setAlpha(0));
+    this.race.events.on('ai', on => this.aiTxt.setText(on ? '🤖 AI KÖR  ·  A eller piltangent = ta över' : '').setAlpha(on ? 1 : 0));
   }
   layout() {
     const w = this.scale.width, h = this.scale.height, u = DPR, p = 16 * u;
@@ -621,6 +644,7 @@ class UIScene extends Phaser.Scene {
     this.bg.fillRoundedRect(this.mmX, this.mmY, mw, mh, 12 * u);
     this.mm.setPosition(this.mmX, this.mmY);
     this.msg.setPosition(w / 2, p + 110 * u);
+    this.aiTxt.setPosition(w / 2, p + 14 * u);
   }
   flash(info) {
     let text;

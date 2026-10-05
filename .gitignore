@@ -2,3 +2,5 @@
 train/.venv/
 train/runs/
 __pycache__/
+train/ai_ref.json
+train/runs_*.log
