@@ -23,7 +23,7 @@
   <h1>🏁 Asfaltsrace</h1>
   <p>Granskogsbanan GP · chikan, hårnål och S-kurvor</p>
   <p><kbd>↑</kbd> gas &nbsp; <kbd>↓</kbd> broms / back &nbsp; <kbd>←</kbd><kbd>→</kbd> sväng</p>
-  <p><kbd>A</kbd> låt AI:n köra &nbsp; <kbd>S</kbd> visa AI:ns sensorer &nbsp; <kbd>T</kbd> byt bana</p>
+  <p><kbd>A</kbd> låt AI:n köra &nbsp; <kbd>S</kbd> visa AI:ns sensorer &nbsp; <kbd>N</kbd> byt AI-modell &nbsp; <kbd>T</kbd> byt bana</p>
   <p><kbd>R</kbd> starta om &nbsp; <kbd>M</kbd> motorljud av/på</p>
   <p class="go">Tryck på valfri piltangent för att köra</p>
 </div></div>
@@ -477,11 +477,13 @@ class RaceScene extends Phaser.Scene {
     this.input.keyboard.on('keydown-M', () => engine.toggle());
     // AI-förare: nätet laddas från model.json (exporterat av train/export.py)
     this.ai = null; this.aiOn = false; this.aiClock = 0; this.aiCmd = { throttle: 0, steer: 0 };
-    const armAi = m => { this.ai = new AiDriver(m, this.track); if (data && data.aiOn) this.toggleAi(); };
-    if (AI_MODEL) armAi(AI_MODEL); else fetch('model.json').then(r => r.json()).then(m => { AI_MODEL = m; armAi(m); }).catch(() => {});
+    this.modelIdx = data && data.modelIdx != null ? data.modelIdx : MODELS.findIndex(m => m.default);
+    if (this.modelIdx < 0) this.modelIdx = 0;
+    this.loadModel(this.modelIdx, () => { if (data && data.aiOn) this.toggleAi(); });
     this.input.keyboard.on('keydown-A', e => { if (!e.repeat) this.toggleAi(); });
+    this.input.keyboard.on('keydown-N', e => { if (!e.repeat) this.loadModel((this.modelIdx + 1) % MODELS.length); });
     this.input.keyboard.on('keydown-S', e => { if (!e.repeat) { this.showSensors = !this.showSensors; this.sensorGfx.clear(); } });
-    this.input.keyboard.on('keydown-T', e => { if (!e.repeat && !this.switching) { this.switching = true; this.scene.restart({ trackIdx: (this.trackIdx + 1) % TRACKS.length, aiOn: this.aiOn, showSensors: this.showSensors }); } });
+    this.input.keyboard.on('keydown-T', e => { if (!e.repeat && !this.switching) { this.switching = true; this.scene.restart({ trackIdx: (this.trackIdx + 1) % TRACKS.length, aiOn: this.aiOn, showSensors: this.showSensors, modelIdx: this.modelIdx }); } });
     const overlay = document.getElementById('overlay');
     if (!overlay.classList.contains('hidden')) {
       const first = (e) => { if (e.key && (e.key.startsWith('Arrow') || e.key === 'a' || e.key === 'A')) { overlay.classList.add('hidden'); engine.start(); window.removeEventListener('keydown', first); } };
@@ -510,6 +512,14 @@ class RaceScene extends Phaser.Scene {
       g.fillStyle(c, 1); g.fillCircle(ex, ey, 4.5);
       g.lineStyle(1.5, 0xffffff, 0.9); g.strokeCircle(ex, ey, 4.5);
     });
+  }
+
+  // Byt AI-modell (N). Filerna cachas i AI_CACHE; AI-läget behålls.
+  loadModel(idx, done) {
+    const def = MODELS[idx]; this.modelIdx = idx; this.modelDef = def;
+    const arm = m => { this.ai = new AiDriver(m, this.track); this.aiCmd = { throttle: 0, steer: 0 }; this.aiClock = AI_DECISION_DT; this.events.emit('model', def); if (done) done(); };
+    if (AI_CACHE[def.file]) arm(AI_CACHE[def.file]);
+    else fetch(def.file).then(r => r.json()).then(m => { AI_CACHE[def.file] = m; arm(m); }).catch(() => {});
   }
 
   toggleAi() {
@@ -666,6 +676,7 @@ class UIScene extends Phaser.Scene {
     this.msg = T(22, '#ffffff', '700').setOrigin(0.5).setAlpha(0);
     this.aiTxt = T(13, '#ffd60a', '700').setOrigin(0.5).setAlpha(0);
     this.trackTxt = T(12, '#cfd8c3');
+    this.modelTxt = T(12, '#cfd8c3');
     this.mm = this.add.image(0, 0, 'minimap').setOrigin(0, 0).setScale(DPR);
     this.dot = this.add.image(0, 0, 'dot').setTint(0xff3b30).setScale(0.55 * DPR);
     this.scale.on('resize', this.layout, this); this.layout();
@@ -673,6 +684,8 @@ class UIScene extends Phaser.Scene {
     this.race.events.on('reset', () => this.msg.setAlpha(0));
     const showAi = on => this.aiTxt.setAlpha(on ? 1 : 0);
     this.race.events.on('ai', showAi); showAi(this.race.aiOn);
+    const showModel = d => this.modelTxt.setText(`AI-MODELL: ${d.name.toUpperCase()}  (${d.status})  ·  N = byt modell`);
+    this.race.events.on('model', showModel); if (this.race.modelDef) showModel(this.race.modelDef);
   }
   layout() {
     const w = this.scale.width, h = this.scale.height, u = DPR, p = 16 * u;
@@ -692,6 +705,7 @@ class UIScene extends Phaser.Scene {
     this.msg.setPosition(w / 2, p + 110 * u);
     this.aiTxt.setPosition(w / 2, p + 14 * u);
     this.trackTxt.setPosition(p + 2 * u, p + 80 * u).setText(`${this.race.trackDef.name.toUpperCase()}  ·  T = byt bana`);
+    this.modelTxt.setPosition(p + 2 * u, p + 98 * u);
   }
   flash(info) {
     let text;
@@ -723,10 +737,14 @@ class UIScene extends Phaser.Scene {
 // ============================================================
 //  Start
 // ============================================================
-let AI_MODEL = null;                                            // model.json, laddas en gång
-let TRACKS = [{ name: 'Granskogsbanan', control: CONTROL }];    // ersätts av tracks.json om den finns
+const AI_CACHE = {};                                                     // modellfil -> laddad JSON
+let MODELS = [{ name: 'Standard', file: 'model.json', status: '', default: true }];   // ersätts av models/index.json
+let TRACKS = [{ name: 'Granskogsbanan', control: CONTROL }];             // ersätts av tracks.json om den finns
 let game;
-fetch('tracks.json').then(r => r.json()).then(t => { TRACKS = t; }).catch(() => {}).finally(() => {
+Promise.all([
+  fetch('tracks.json').then(r => r.json()).then(t => { TRACKS = t; }).catch(() => {}),
+  fetch('models/index.json').then(r => r.json()).then(m => { MODELS = m; }).catch(() => {}),
+]).finally(() => {
   game = new Phaser.Game({
     type: Phaser.AUTO, parent: 'game',
     width: Math.round(innerWidth * DPR), height: Math.round(innerHeight * DPR),

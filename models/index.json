@@ -1,0 +1,56 @@
+[
+ {
+  "name": "Granskogsbanan 25k steg",
+  "file": "models/gb_025k.json",
+  "status": "av banan efter 1160 px",
+  "default": false
+ },
+ {
+  "name": "Granskogsbanan 50k steg",
+  "file": "models/gb_050k.json",
+  "status": "av banan efter 6721 px",
+  "default": false
+ },
+ {
+  "name": "Granskogsbanan 75k steg",
+  "file": "models/gb_075k.json",
+  "status": "varv 20.4 s",
+  "default": false
+ },
+ {
+  "name": "Granskogsbanan 100k steg",
+  "file": "models/gb_100k.json",
+  "status": "varv 20.4 s",
+  "default": false
+ },
+ {
+  "name": "Granskogsbanan 150k steg",
+  "file": "models/gb_150k.json",
+  "status": "varv 20.4 s",
+  "default": false
+ },
+ {
+  "name": "Granskogsbanan 200k steg",
+  "file": "models/gb_200k.json",
+  "status": "varv 20.3 s",
+  "default": false
+ },
+ {
+  "name": "Granskogsbanan 300k steg",
+  "file": "models/gb_300k.json",
+  "status": "varv 20.2 s",
+  "default": false
+ },
+ {
+  "name": "Granskogsbanan 500k steg",
+  "file": "models/gb_500k.json",
+  "status": "varv 20.4 s",
+  "default": false
+ },
+ {
+  "name": "Slumpbanor 2M steg",
+  "file": "models/slump_2M.json",
+  "status": "varv 20.3 s",
+  "default": true
+ }
+]
