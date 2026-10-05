@@ -1,3 +1,5 @@
 node_modules/
-clips/
+public/clips/*
+!public/clips/index.json
 out/
+npm-install.log
