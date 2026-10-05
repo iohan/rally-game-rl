@@ -23,7 +23,7 @@
   <h1>🏁 Asfaltsrace</h1>
   <p>Granskogsbanan GP · chikan, hårnål och S-kurvor</p>
   <p><kbd>↑</kbd> gas &nbsp; <kbd>↓</kbd> broms / back &nbsp; <kbd>←</kbd><kbd>→</kbd> sväng</p>
-  <p><kbd>A</kbd> låt AI:n köra &nbsp; <kbd>R</kbd> starta om &nbsp; <kbd>M</kbd> motorljud av/på</p>
+  <p><kbd>A</kbd> låt AI:n köra &nbsp; <kbd>T</kbd> byt bana &nbsp; <kbd>R</kbd> starta om &nbsp; <kbd>M</kbd> motorljud av/på</p>
   <p class="go">Tryck på valfri piltangent för att köra</p>
 </div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
@@ -63,7 +63,14 @@ function fmtTime(ms) { if (ms == null) return '--:--.--'; const m = Math.floor(m
 function buildEnvironment(track) {
   const pts = track.pts;
   const distTo = (x, y) => track.nearest(x, y).dist;
-  const lake = { x: 1700, y: 1450, rx: 380, ry: 240 };
+  // Sjön läggs där det är längst till banan; för liten plats -> ingen sjö
+  let lake = null, bestD = 0;
+  for (let x = 400; x < WORLD_W - 400; x += 100) for (let y = 300; y < WORLD_H - 300; y += 100) {
+    const d = Math.min(distTo(x, y), Math.hypot(x - pts[0].x, y - pts[0].y) - 300);
+    if (d > bestD) { bestD = d; lake = { x, y }; }
+  }
+  const lrx = Math.min(380, bestD - HALF_W - KERB_W - 70);
+  lake = lrx >= 140 ? { ...lake, rx: lrx, ry: lrx * 0.63 } : null;
   // Grusfällor på utsidan av de skarpaste kurvorna (lokala kurvaturmaxima)
   const N = track.N, peaks = [];
   for (let k = 0; k < N; k++) {
@@ -91,7 +98,7 @@ function buildEnvironment(track) {
     const lx = dx * c - dy * s, ly = dx * s + dy * c;
     return (lx / (e.rx * m)) ** 2 + (ly / (e.ry * m)) ** 2 < 1;
   };
-  const inLake = (x, y, m = 1) => inEll(lake, x, y, m);
+  const inLake = (x, y, m = 1) => lake != null && inEll(lake, x, y, m);
   const inGravel = (x, y, m = 1) => gravels.some(g => inEll(g, x, y, m));
 
   // Depåbyggnad utanför startrakan
@@ -182,6 +189,7 @@ function renderWorld(track, env) {
 
   // --- Sjö ---
   const L = env.lake;
+  if (L) {
   ctx.fillStyle = '#d9c795'; ellipse(ctx, L.x, L.y, L.rx + 26, L.ry + 20); ctx.fill();
   ctx.fillStyle = '#bca977'; ellipse(ctx, L.x, L.y, L.rx + 9, L.ry + 7); ctx.fill();
   const wg = ctx.createRadialGradient(L.x - 70, L.y - 50, 10, L.x, L.y, L.rx);
@@ -194,6 +202,7 @@ function renderWorld(track, env) {
   ctx.restore();
   // vass
   for (let i = 0; i < 60; i++) { const a = R(0, TAU); const x = L.x + Math.cos(a) * (L.rx + R(4, 22)), y = L.y + Math.sin(a) * (L.ry + R(4, 18)); ctx.fillStyle = pick(['#2f6a2b', '#3d7f33', '#5a8c2e']); ctx.beginPath(); ctx.arc(x, y, R(2.5, 5), 0, TAU); ctx.fill(); }
+  }
 
   // --- Grusfällor ---
   const sandTile = noiseTile(96, ['rgba(255,255,255,0.18)', 'rgba(90,70,40,0.22)', 'rgba(0,0,0,0.08)'], 700, 0.5, 1.3);
@@ -380,7 +389,7 @@ function renderMinimap(track, env) {
   const s = 200 / WORLD_W, w = Math.ceil(WORLD_W * s) + 20, h = Math.ceil(WORLD_H * s) + 20;
   const c = mk(w, h), ctx = c.getContext('2d');
   ctx.translate(10, 10); ctx.scale(s, s);
-  ctx.fillStyle = '#3b8cc9'; ellipse(ctx, env.lake.x, env.lake.y, env.lake.rx, env.lake.ry); ctx.fill();
+  if (env.lake) { ctx.fillStyle = '#3b8cc9'; ellipse(ctx, env.lake.x, env.lake.y, env.lake.rx, env.lake.ry); ctx.fill(); }
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   pathAlong(ctx, track.pts, 0, 0, track.N, true);
   ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.lineWidth = 2 * HALF_W + 70; ctx.stroke();
@@ -422,18 +431,24 @@ const engine = {
 // ============================================================
 class RaceScene extends Phaser.Scene {
   constructor() { super('race'); }
-  create() {
-    this.track = buildTrack();
+  create(data) {
+    // Scenen startas om (scene.restart) vid banbyte; data = { trackIdx, aiOn }
+    this.trackIdx = (data && data.trackIdx) || 0; this.switching = false;
+    this.trackDef = TRACKS[this.trackIdx];
+    this.track = buildTrack(this.trackDef.control);
     this.env = buildEnvironment(this.track);
+    for (const k of ['world', 'minimap']) if (this.textures.exists(k)) this.textures.remove(k);
     this.textures.addCanvas('world', renderWorld(this.track, this.env));
-    this.textures.addCanvas('car', renderCar());
-    this.textures.addCanvas('carShadow', renderCarShadow());
     const mm = renderMinimap(this.track, this.env);
     this.textures.addCanvas('minimap', mm.canvas); this.mmScale = mm.s;
-    const g = this.make.graphics({ add: false });
-    g.fillStyle(0xffffff, 1); g.fillCircle(8, 8, 8); g.generateTexture('dot', 16, 16);
-    g.clear(); g.fillStyle(0x000000, 1); g.fillRect(0, 0, 10, 4); g.generateTexture('skid', 10, 4);
-    g.destroy();
+    if (!this.textures.exists('car')) {
+      this.textures.addCanvas('car', renderCar());
+      this.textures.addCanvas('carShadow', renderCarShadow());
+      const g = this.make.graphics({ add: false });
+      g.fillStyle(0xffffff, 1); g.fillCircle(8, 8, 8); g.generateTexture('dot', 16, 16);
+      g.clear(); g.fillStyle(0x000000, 1); g.fillRect(0, 0, 10, 4); g.generateTexture('skid', 10, 4);
+      g.destroy();
+    }
 
     this.add.image(0, 0, 'world').setOrigin(0).setDepth(0);
     this.skids = this.add.renderTexture(0, 0, WORLD_W, WORLD_H).setOrigin(0).setDepth(1);
@@ -459,10 +474,15 @@ class RaceScene extends Phaser.Scene {
     this.input.keyboard.on('keydown-M', () => engine.toggle());
     // AI-förare: nätet laddas från model.json (exporterat av train/export.py)
     this.ai = null; this.aiOn = false; this.aiClock = 0; this.aiCmd = { throttle: 0, steer: 0 };
-    fetch('model.json').then(r => r.json()).then(m => { this.ai = new AiDriver(m, this.track); }).catch(() => {});
-    this.input.keyboard.on('keydown-A', () => this.toggleAi());
-    const first = (e) => { if (e.key && (e.key.startsWith('Arrow') || e.key === 'a' || e.key === 'A')) { document.getElementById('overlay').classList.add('hidden'); engine.start(); window.removeEventListener('keydown', first); } };
-    window.addEventListener('keydown', first);
+    const armAi = m => { this.ai = new AiDriver(m, this.track); if (data && data.aiOn) this.toggleAi(); };
+    if (AI_MODEL) armAi(AI_MODEL); else fetch('model.json').then(r => r.json()).then(m => { AI_MODEL = m; armAi(m); }).catch(() => {});
+    this.input.keyboard.on('keydown-A', e => { if (!e.repeat) this.toggleAi(); });
+    this.input.keyboard.on('keydown-T', e => { if (!e.repeat && !this.switching) { this.switching = true; this.scene.restart({ trackIdx: (this.trackIdx + 1) % TRACKS.length, aiOn: this.aiOn }); } });
+    const overlay = document.getElementById('overlay');
+    if (!overlay.classList.contains('hidden')) {
+      const first = (e) => { if (e.key && (e.key.startsWith('Arrow') || e.key === 'a' || e.key === 'A')) { overlay.classList.add('hidden'); engine.start(); window.removeEventListener('keydown', first); } };
+      window.addEventListener('keydown', first);
+    }
 
     this.car = { x: 0, y: 0, rot: 0, vx: 0, vy: 0, surf: 'asphalt', lat: 0, fwd: 0 };
     this.resetCar();
@@ -621,12 +641,14 @@ class UIScene extends Phaser.Scene {
     this.surfTxt = T(11, '#cfd8c3');
     this.msg = T(22, '#ffffff', '700').setOrigin(0.5).setAlpha(0);
     this.aiTxt = T(13, '#ffd60a', '700').setOrigin(0.5).setAlpha(0);
+    this.trackTxt = T(12, '#cfd8c3');
     this.mm = this.add.image(0, 0, 'minimap').setOrigin(0, 0).setScale(DPR);
     this.dot = this.add.image(0, 0, 'dot').setTint(0xff3b30).setScale(0.55 * DPR);
     this.scale.on('resize', this.layout, this); this.layout();
     this.race.events.on('lap', info => this.flash(info));
     this.race.events.on('reset', () => this.msg.setAlpha(0));
-    this.race.events.on('ai', on => this.aiTxt.setText(on ? '🤖 AI KÖR  ·  A eller piltangent = ta över' : '').setAlpha(on ? 1 : 0));
+    const showAi = on => this.aiTxt.setText(on ? '🤖 AI KÖR  ·  A eller piltangent = ta över' : '').setAlpha(on ? 1 : 0);
+    this.race.events.on('ai', showAi); showAi(this.race.aiOn);
   }
   layout() {
     const w = this.scale.width, h = this.scale.height, u = DPR, p = 16 * u;
@@ -645,6 +667,7 @@ class UIScene extends Phaser.Scene {
     this.mm.setPosition(this.mmX, this.mmY);
     this.msg.setPosition(w / 2, p + 110 * u);
     this.aiTxt.setPosition(w / 2, p + 14 * u);
+    this.trackTxt.setPosition(p + 2 * u, p + 80 * u).setText(`${this.race.trackDef.name.toUpperCase()}  ·  T = byt bana`);
   }
   flash(info) {
     let text;
@@ -672,15 +695,20 @@ class UIScene extends Phaser.Scene {
 // ============================================================
 //  Start
 // ============================================================
-const game = new Phaser.Game({
-  type: Phaser.AUTO, parent: 'game',
-  width: Math.round(innerWidth * DPR), height: Math.round(innerHeight * DPR),
-  backgroundColor: '#3f7a2f',
-  scale: { mode: Phaser.Scale.NONE, autoCenter: Phaser.Scale.NO_CENTER },
-  render: { antialias: true, powerPreference: 'high-performance' },
-  scene: [RaceScene, UIScene]
+let AI_MODEL = null;                                            // model.json, laddas en gång
+let TRACKS = [{ name: 'Granskogsbanan', control: CONTROL }];    // ersätts av tracks.json om den finns
+let game;
+fetch('tracks.json').then(r => r.json()).then(t => { TRACKS = t; }).catch(() => {}).finally(() => {
+  game = new Phaser.Game({
+    type: Phaser.AUTO, parent: 'game',
+    width: Math.round(innerWidth * DPR), height: Math.round(innerHeight * DPR),
+    backgroundColor: '#3f7a2f',
+    scale: { mode: Phaser.Scale.NONE, autoCenter: Phaser.Scale.NO_CENTER },
+    render: { antialias: true, powerPreference: 'high-performance' },
+    scene: [RaceScene, UIScene]
+  });
+  addEventListener('resize', () => game.scale.resize(Math.round(innerWidth * DPR), Math.round(innerHeight * DPR)));
 });
-addEventListener('resize', () => game.scale.resize(Math.round(innerWidth * DPR), Math.round(innerHeight * DPR)));
 </script>
 </body>
 </html>

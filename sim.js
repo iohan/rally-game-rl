@@ -46,10 +46,10 @@ function cr(p0, p1, p2, p3, t) {
 // ============================================================
 //  Bana: mittlinje som ~10 px-samplade punkter med tangent, normal, kurvatur
 // ============================================================
-function buildTrack() {
-  const raw = [], n = CONTROL.length, S = 24;
+function buildTrack(control = CONTROL) {
+  const raw = [], n = control.length, S = 24;
   for (let i = 0; i < n; i++) {
-    const p0 = CONTROL[(i - 1 + n) % n], p1 = CONTROL[i], p2 = CONTROL[(i + 1) % n], p3 = CONTROL[(i + 2) % n];
+    const p0 = control[(i - 1 + n) % n], p1 = control[i], p2 = control[(i + 1) % n], p3 = control[(i + 2) % n];
     for (let s = 0; s < S; s++) raw.push(cr(p0, p1, p2, p3, s / S));
   }
   const dist = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1]);
@@ -86,7 +86,7 @@ function buildTrack() {
   }
   if (cur) runs.push(cur);
   return {
-    pts, N, step, runs, total,
+    pts, N, step, runs, total, control,
     nearest(x, y) {
       let best = Infinity, bi = 0;
       for (let k = 0; k < N; k++) { const dx = pts[k].x - x, dy = pts[k].y - y; const d = dx * dx + dy * dy; if (d < best) { best = d; bi = k; } }

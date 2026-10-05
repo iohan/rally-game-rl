@@ -53,10 +53,12 @@ def cr(p0, p1, p2, p3, t):
 class Track:
     """Mittlinje som ~10 px-samplade punkter. Attribut som numpy-arrayer av längd N."""
 
-    def __init__(self):
-        raw = []; n = len(CONTROL); S = 24
+    def __init__(self, control=None):
+        control = CONTROL if control is None else control
+        self.control = control
+        raw = []; n = len(control); S = 24
         for i in range(n):
-            p0, p1, p2, p3 = CONTROL[(i - 1) % n], CONTROL[i], CONTROL[(i + 1) % n], CONTROL[(i + 2) % n]
+            p0, p1, p2, p3 = control[(i - 1) % n], control[i], control[(i + 1) % n], control[(i + 2) % n]
             for s in range(S):
                 raw.append(cr(p0, p1, p2, p3, s / S))
         dist = lambda a, b: math.hypot(b[0] - a[0], b[1] - a[1])

@@ -1,4 +1,7 @@
-"""Träna en PPO-agent att köra ett varv. Kör:  python train.py [steg] [namn]
+"""Träna en PPO-agent att köra ett varv.
+  python train.py [steg] [namn] [fixed|random]
+    fixed  = träna på Granskogsbanan (default)
+    random = ny slumpbana varje episod; Granskogsbanan hålls utanför träningen och används bara för eval
 Följ träningen:  tensorboard --logdir runs
 """
 import os, sys, time
@@ -13,9 +16,9 @@ from env import RaceEnv
 N_ENVS = 8
 
 
-def make_env(seed, random_start=True):
+def make_env(seed, random_start=True, random_track=False):
     def _f():
-        return Monitor(RaceEnv(random_start=random_start, seed=seed), info_keywords=('progress_px', 'lap', 'off'))
+        return Monitor(RaceEnv(random_start=random_start, seed=seed, random_track=random_track), info_keywords=('progress_px', 'lap', 'off'))
     return _f
 
 
@@ -39,10 +42,11 @@ class StatsCallback(BaseCallback):
 if __name__ == '__main__':
     steps = int(sys.argv[1]) if len(sys.argv) > 1 else 500_000
     name = sys.argv[2] if len(sys.argv) > 2 else time.strftime('ppo_%m%d_%H%M')
+    random_track = len(sys.argv) > 3 and sys.argv[3] == 'random'
     out = os.path.join('runs', name); os.makedirs(out, exist_ok=True)
     torch.set_num_threads(2)
 
-    venv = SubprocVecEnv([make_env(i) for i in range(N_ENVS)])
+    venv = SubprocVecEnv([make_env(i, random_track=random_track) for i in range(N_ENVS)])
     eval_env = DummyVecEnv([make_env(1000, random_start=False)])   # utvärdering: från startlinjen
 
     model = PPO(
@@ -60,4 +64,4 @@ if __name__ == '__main__':
     t0 = time.time()
     model.learn(total_timesteps=steps, callback=callbacks, tb_log_name=name)
     model.save(os.path.join(out, 'final'))
-    print(f"klart: {steps} steg på {(time.time()-t0)/60:.1f} min -> {out}/final.zip (bästa enligt eval: {out}/best_model.zip)")
+    print(f"klart ({'slumpbanor' if random_track else 'Granskogsbanan'}): {steps} steg på {(time.time()-t0)/60:.1f} min -> {out}/final.zip (bästa enligt eval: {out}/best_model.zip)")

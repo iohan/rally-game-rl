@@ -21,6 +21,7 @@ import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 from sim import Track, Car, step_car, SURF, HALF_W, START_IDX_FROM_END
+from tracks import make_random_track
 
 RAY_ANGLES = np.deg2rad([-60, -40, -20, 0, 20, 40, 60])
 RAY_MAX = 400.0          # px
@@ -42,9 +43,11 @@ R_LAP = 50.0
 class RaceEnv(gym.Env):
     metadata = {'render_modes': []}
 
-    def __init__(self, random_start=True, allow_kerb=False, seed=None):
+    def __init__(self, random_start=True, allow_kerb=False, seed=None, track=None, random_track=False):
+        """track: Track-objekt (default Granskogsbanan). random_track: ny slumpbana varje episod."""
         super().__init__()
-        self.track = Track()
+        self.track = track or Track()
+        self.random_track = random_track
         self.random_start = random_start
         self.limit = HALF_W + (18 if allow_kerb else 0)
         self.observation_space = spaces.Box(-1.0, 1.0, shape=(14,), dtype=np.float32)
@@ -84,6 +87,7 @@ class RaceEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         if seed is not None: self.rng = np.random.default_rng(seed)
+        if self.random_track: self.track = make_random_track(self.rng)
         t = self.track
         idx = int(self.rng.integers(t.N)) if self.random_start else t.N - START_IDX_FROM_END
         self._place(idx, self.rng.uniform(-30, 30), self.rng.uniform(-0.2, 0.2))
