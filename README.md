@@ -69,7 +69,9 @@ film/make.sh
 ```
 
 The first run installs npm packages (Remotion, Playwright). A full run takes about 15 min. `film/make.sh step3`
-redoes a single scene. Output: `film/out/<step>-<format>.mp4`. Scene contents (track, model, captions, length)
+redoes a single scene, `film/make.sh full` only the complete film. Output: `film/out/<step>-<format>.mp4` (one film per step) and
+`film/out/full-<format>.mp4` (every step in one film, ready to publish: intro card, chapter card + clips per step, GitHub end card only at the end).
+Scene contents (track, model, captions, length)
 live in `film/src/scenes.js`; title cards and layout in `film/src/Film.jsx`.
 
 **Record your own clip** (e.g. step 1, manual driving): open the game with `?rec=16x9` or `?rec=9x16`.

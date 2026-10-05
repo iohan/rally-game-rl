@@ -1,7 +1,7 @@
 import React from 'react';
 import { Composition } from 'remotion';
 import { SCENES, FORMATS, FPS } from './scenes.js';
-import { Film, TITLE_FRAMES, END_FRAMES, sceneFrames } from './Film.jsx';
+import { Film, FullFilm, TITLE_FRAMES, END_FRAMES, sceneFrames, fullFrames } from './Film.jsx';
 
 export const Root = () => (
   <>
@@ -13,5 +13,13 @@ export const Root = () => (
         durationInFrames={TITLE_FRAMES + sceneFrames(scene, fmt) + END_FRAMES}
       />
     )))}
+    {FORMATS.map(fmt => (
+      <Composition
+        key={`full-${fmt.id}`} id={`full-${fmt.id}`}
+        component={FullFilm} defaultProps={{ fmt }}
+        width={fmt.width} height={fmt.height} fps={FPS}
+        durationInFrames={fullFrames(fmt)}
+      />
+    ))}
   </>
 );

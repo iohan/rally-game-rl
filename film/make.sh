@@ -2,6 +2,7 @@
 # Redo all films from scratch: curve data -> game clips -> Remotion render.
 #   ./make.sh            everything
 #   ./make.sh step3      only scenes whose id starts with step3
+#   ./make.sh full       only the complete film (all steps in one, out/full-<format>.mp4)
 set -e
 cd "$(dirname "$0")"
 [ -d node_modules ] || npm install --no-audit --no-fund

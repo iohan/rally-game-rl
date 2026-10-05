@@ -8,6 +8,12 @@ export const FORMATS = [
   { id: '9x16', width: 1080, height: 1920, zoom: 1.15, ui: 1.1 },   // portrait (Reels, Shorts, TikTok)
 ];
 
+// The complete film: intro card + every step above + one end card (GitHub etc.) at the very end.
+export const FULL = {
+  id: 'full', title: 'Teaching an AI to drive', heading: 'In six steps',
+  text: 'A top-down racing game, a hand-written driver, and a reinforcement-learning agent that learns to drive on tracks it has never seen.',
+};
+
 export const SCENES = [
   {
     id: 'step1', title: 'Step 1', heading: 'A game', text: 'A top-down racing game built in Phaser. You drive around Granskogsbanan GP yourself.',

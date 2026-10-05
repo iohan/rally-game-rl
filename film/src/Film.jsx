@@ -1,11 +1,12 @@
 import React from 'react';
 import { AbsoluteFill, Sequence, OffthreadVideo, staticFile, useCurrentFrame, useVideoConfig, interpolate, spring } from 'remotion';
-import { FPS } from './scenes.js';
+import { FPS, FULL, SCENES } from './scenes.js';
 import clipIndex from '../public/clips/index.json';
 import { Curves } from './Curves.jsx';
 
 export const TITLE_FRAMES = 4 * FPS;
 export const END_FRAMES = 3 * FPS;
+export const FULL_END_FRAMES = 6 * FPS;   // the end card is shown only once in the full film, so give it time
 const FADE = Math.round(0.4 * FPS);
 
 export const clipFrames = (clip, fmt) => clipIndex[`${clip.name}_${fmt.id}`] || Math.round(clip.seconds * FPS);
@@ -63,20 +64,32 @@ const GameClip = ({ clip, fmt }) => (
   </AbsoluteFill>
 );
 
+// Lays out parts back to back. Each part fades in/out against the green background.
+const partList = () => {
+  let at = 0; const parts = [];
+  const push = (key, n, node) => { parts.push(<Sequence key={key} from={at} durationInFrames={n}><Fade length={n}>{node}</Fade></Sequence>); at += n; };
+  return { parts, push };
+};
+const pushScene = (push, scene, fmt) => {
+  if (scene.curves) { push(`${scene.id}-curves`, scene.seconds * FPS, <Curves fmt={fmt} />); return; }
+  for (const clip of scene.clips) push(clip.name, clipFrames(clip, fmt), <GameClip clip={clip} fmt={fmt} />);
+};
+
+// One film per step: title card -> clips -> end card.
 export const Film = ({ scene, fmt }) => {
-  let at = TITLE_FRAMES;
-  const parts = [];
-  if (scene.curves) { const n = scene.seconds * FPS; parts.push(<Sequence key="curves" from={at} durationInFrames={n}><Fade length={n}><Curves fmt={fmt} /></Fade></Sequence>); at += n; }
-  else for (const clip of scene.clips) {
-    const n = clipFrames(clip, fmt);
-    parts.push(<Sequence key={clip.name} from={at} durationInFrames={n}><Fade length={n}><GameClip clip={clip} fmt={fmt} /></Fade></Sequence>);
-    at += n;
-  }
-  return (
-    <AbsoluteFill style={{ background: GREEN }}>
-      <Sequence from={0} durationInFrames={TITLE_FRAMES}><Fade length={TITLE_FRAMES}><TitleCard scene={scene} fmt={fmt} /></Fade></Sequence>
-      {parts}
-      <Sequence from={at} durationInFrames={END_FRAMES}><Fade length={END_FRAMES}><EndCard fmt={fmt} /></Fade></Sequence>
-    </AbsoluteFill>
-  );
+  const { parts, push } = partList();
+  push('title', TITLE_FRAMES, <TitleCard scene={scene} fmt={fmt} />);
+  pushScene(push, scene, fmt);
+  push('end', END_FRAMES, <EndCard fmt={fmt} />);
+  return <AbsoluteFill style={{ background: GREEN }}>{parts}</AbsoluteFill>;
+};
+
+// The complete film: intro card -> (chapter card -> clips) for every step -> one end card.
+export const fullFrames = fmt => TITLE_FRAMES + SCENES.reduce((a, s) => a + TITLE_FRAMES + sceneFrames(s, fmt), 0) + FULL_END_FRAMES;
+export const FullFilm = ({ fmt }) => {
+  const { parts, push } = partList();
+  push('intro', TITLE_FRAMES, <TitleCard scene={FULL} fmt={fmt} />);
+  for (const scene of SCENES) { push(`${scene.id}-title`, TITLE_FRAMES, <TitleCard scene={scene} fmt={fmt} />); pushScene(push, scene, fmt); }
+  push('end', FULL_END_FRAMES, <EndCard fmt={fmt} />);
+  return <AbsoluteFill style={{ background: GREEN }}>{parts}</AbsoluteFill>;
 };
