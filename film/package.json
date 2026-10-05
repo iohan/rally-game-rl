@@ -1,0 +1,19 @@
+{
+  "name": "asfaltsrace-film",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "record": "node record.mjs",
+    "studio": "remotion studio src/index.jsx",
+    "render": "node render.mjs"
+  },
+  "dependencies": {
+    "@remotion/bundler": "^4.0.533",
+    "@remotion/cli": "^4.0.533",
+    "@remotion/renderer": "^4.0.533",
+    "playwright": "^1.63.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.533"
+  }
+}

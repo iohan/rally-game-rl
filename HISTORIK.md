@@ -27,6 +27,12 @@ Bara steg 1 (inget AI-läge) och 2a (terminal) kräver checkout av sin tagg.
 | `171587d` | Första PPO-träningen (`train.py`). Innehöll buggen där framsteg mättes över halva beslutet; "varv" var i själva verket två varv. |
 | `1e08d20` | Generator viktad mot snäva kurvor, `model.json` = run4. |
 
+## Filmerna
+
+Spelas in och renderas automatiskt med `film/make.sh` (se README). En film per steg ovan, 16:9 och 1:1.
+Steg 1 och 2a körs av den regelstyrda föraren (`driver=rule` i filmläget), eftersom ingen människa sitter vid tangenterna
+vid inspelningen; byt gärna ut steg 1-klippet mot en egen skärminspelning.
+
 ## Träningskurvor (steg 6)
 
 - Färdiga: `train/curves.png` (stillbild) och `train/curves.gif` (kurvan växer fram på 10 s). Regenerera med

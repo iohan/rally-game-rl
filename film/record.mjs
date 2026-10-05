@@ -1,0 +1,74 @@
+// Spelar in spelklipp med Playwright: spelet stegas deterministiskt frame för frame (window.filmAdvance)
+// och varje frame (JPEG) pipas till ffmpeg. Resultat: public/clips/<namn>_<format>.mp4 + index.json.
+//   node record.mjs            alla klipp
+//   node record.mjs steg2c     bara klipp vars scen-id börjar så
+import { chromium } from 'playwright';
+import { spawn } from 'node:child_process';
+import { createServer } from 'node:http';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { SCENES, FORMATS, FPS } from './src/scenes.js';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.join(here, '..');           // spelets mapp (index.html)
+const OUT = path.join(here, 'public', 'clips');
+const FFMPEG = path.join(here, 'node_modules', '.bin', 'remotion');
+const filter = process.argv[2] || '';
+
+// Liten statisk server för spelet (python3 -m http.server fungerar också, men detta är självförsörjande)
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json' };
+const server = createServer(async (req, res) => {
+  const p = path.join(ROOT, decodeURIComponent(new URL(req.url, 'http://x').pathname.replace(/\/$/, '/index.html')));
+  try { const b = await readFile(p); res.setHeader('Content-Type', MIME[path.extname(p)] || 'application/octet-stream'); res.setHeader('Content-Length', b.length); res.end(b); }
+  catch { res.statusCode = 404; res.end(); }
+});
+await new Promise(r => server.listen(0, '127.0.0.1', r));
+const PORT = server.address().port;
+
+async function record(clip, fmt) {
+  const name = `${clip.name}_${fmt.id}`, file = path.join(OUT, name + '.mp4');
+  const params = { film: 1, zoom: (fmt.zoom * (clip.params.zoomMul || 1)).toFixed(2), ui: fmt.ui || 1, ...clip.params };
+  delete params.zoomMul;
+  const url = `http://127.0.0.1:${PORT}/?` + new URLSearchParams(params);
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: fmt.width, height: fmt.height }, deviceScaleFactor: 1 });
+  await page.goto(url);
+  await page.waitForFunction(() => window.filmState && window.filmState().ready, null, { timeout: 20000 });
+  const ff = spawn(FFMPEG, ['ffmpeg', '-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-',
+    '-vf', `scale=${fmt.width}:${fmt.height}:flags=lanczos`, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '17', '-preset', 'medium', file], { stdio: ['pipe', 'inherit', 'inherit'] });
+  const maxFrames = Math.round(clip.seconds * FPS);
+  let frames = 0, stopAt = null;
+  const SIM_PER_FRAME = 60 / FPS;
+  for (let f = 0; f < maxFrames; f++) {
+    const { jpeg, state } = await page.evaluate(n => { window.filmAdvance(n); return { jpeg: window.filmFrame(), state: window.filmState() }; }, SIM_PER_FRAME);
+    const ok = ff.stdin.write(Buffer.from(jpeg.split(',')[1], 'base64'));
+    if (!ok) await new Promise(r => ff.stdin.once('drain', r));
+    frames++;
+    if (stopAt == null) {
+      if (clip.stopWhen === 'off' && state.surf !== 'asphalt') stopAt = f + Math.round(1.5 * FPS);
+      if (clip.stopWhen === 'lap' && state.lap >= 2) stopAt = f + Math.round(1.2 * FPS);
+    }
+    if (stopAt != null && f >= stopAt) break;
+  }
+  ff.stdin.end();
+  await new Promise((res, rej) => ff.on('close', c => c === 0 ? res() : rej(new Error('ffmpeg exit ' + c))));
+  await browser.close();
+  console.log(`${name}: ${frames} frames (${(frames / FPS).toFixed(1)} s)`);
+  return [name, frames];
+}
+
+await mkdir(OUT, { recursive: true });
+const indexFile = path.join(OUT, 'index.json');
+const index = existsSync(indexFile) ? JSON.parse(await readFile(indexFile, 'utf8')) : {};
+for (const scene of SCENES) {
+  if (!scene.id.startsWith(filter) || !scene.clips) continue;
+  for (const clip of scene.clips) for (const fmt of FORMATS) {
+    const [name, frames] = await record(clip, fmt);
+    index[name] = frames;
+    await writeFile(indexFile, JSON.stringify(index, null, 1));
+  }
+}
+server.close();
+console.log('klart ->', OUT);

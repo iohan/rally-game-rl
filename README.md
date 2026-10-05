@@ -59,6 +59,22 @@ cd train
 
 Efter export: `node check_ai.js` verifierar att JS-föraren fattar exakt samma beslut som Python.
 
+## Filmer
+
+`film/` innehåller en pipeline som spelar in spelet deterministiskt (Playwright) och komponerar filmer med Remotion,
+en per steg i [HISTORIK.md](HISTORIK.md), i två format: 1920×1080 (16:9) och 1080×1080 (LinkedIn/Instagram).
+
+```bash
+film/make.sh
+```
+
+Första körningen installerar npm-paket (Remotion, Playwright). Hela körningen tar ca 15 min. `film/make.sh steg3`
+gör bara om en scen. Resultat: `film/out/<steg>-<format>.mp4`. Scenernas innehåll (bana, modell, bildtexter, längd)
+ligger i `film/src/scenes.js`; titelkort och layout i `film/src/Film.jsx`.
+
+Spelet har ett filmläge via URL-parametrar (`?film=1&track=3&model=8&ai=1&sensors=1`) där spelloopen stegas
+frame för frame, så samma kod ger samma film varje gång.
+
 ## Hur AI:n fungerar
 
 - **Observation** (14 tal): 7 avståndsstrålar till asfaltkanten, fart, sidoglid, sidoposition, riktningsfel, kurvatur 100/250/500 px framåt. Inget säger vilken bana den är på, därför generaliserar den till nya banor.
@@ -78,3 +94,4 @@ Efter export: `node check_ai.js` verifierar att JS-föraren fattar exakt samma b
 | `train/sim.py`, `train/env.py` | Python-port av fysiken, Gymnasium-miljö |
 | `train/tracks.py` | testbanor, validering, slumpgenerator |
 | `train/runs/` | modeller och loggar (utanför git) |
+| `film/` | filmpipeline: `record.mjs` (Playwright), `src/` (Remotion), `make.sh` |
