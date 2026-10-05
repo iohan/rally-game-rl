@@ -30,8 +30,8 @@ Bara steg 1 (inget AI-läge) och 2a (terminal) kräver checkout av sin tagg.
 ## Filmerna
 
 Spelas in och renderas automatiskt med `film/make.sh` (se README). En film per steg ovan, 16:9 (liggande) och 9:16 (stående), på engelska.
-Steg 1 och 2a körs av den regelstyrda föraren (`driver=rule` i filmläget), eftersom ingen människa sitter vid tangenterna
-vid inspelningen; byt gärna ut steg 1-klippet mot en egen skärminspelning.
+Steg 2a körs av den regelstyrda föraren (`driver=rule` i filmläget). Steg 1 spelas in manuellt: öppna spelet med
+`?rec=16x9` respektive `?rec=9x16`, tryck `V`, kör ett varv, tryck `V` igen och importera med `film/import-clip.mjs` (se README).
 
 ## Träningskurvor (steg 6)
 

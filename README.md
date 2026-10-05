@@ -72,6 +72,17 @@ Första körningen installerar npm-paket (Remotion, Playwright). Hela körningen
 gör bara om en scen. Resultat: `film/out/<steg>-<format>.mp4`. Scenernas innehåll (bana, modell, bildtexter, längd)
 ligger i `film/src/scenes.js`; titelkort och layout i `film/src/Film.jsx`.
 
+**Spela in ett eget klipp** (t.ex. steg 1, manuell körning): öppna spelet med `?rec=16x9` eller `?rec=9x16`.
+Canvasen låses då till filmstorleken och skalas att passa fönstret. Tryck `V` för att starta inspelningen, kör,
+tryck `V` igen så laddas en `.webm` ner. Importera och rendera om:
+
+```bash
+cd film && node import-clip.mjs ~/Downloads/asphalt-race-16x9-*.webm step1_game_16x9 && node render.mjs step1
+```
+
+Steg 1 är markerat `manual: true` i `scenes.js`, så `make.sh` rör inte ditt klipp. `node record.mjs "" --all` spelar in
+även manuella klipp med regelföraren om du vill ha det automatiska igen.
+
 Spelet har ett filmläge via URL-parametrar (`?film=1&track=3&model=8&ai=1&sensors=1`) där spelloopen stegas
 frame för frame, så samma kod ger samma film varje gång.
 

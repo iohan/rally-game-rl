@@ -18,6 +18,7 @@ const OUT = path.join(here, 'public', 'clips');
 const FFMPEG = path.join(here, 'node_modules', '.bin', 'remotion');
 const filter = process.argv[2] || '';
 const force = process.argv.includes('--force');
+const all = process.argv.includes('--all');      // spela även in klipp markerade manual: true (med regelföraren)
 
 // Liten statisk server för spelet (python3 -m http.server fungerar också, men detta är självförsörjande)
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json' };
@@ -68,6 +69,11 @@ for (const scene of SCENES) {
   if (!scene.id.startsWith(filter) || !scene.clips) continue;
   for (const clip of scene.clips) for (const fmt of FORMATS) {
     const name = `${clip.name}_${fmt.id}`;
+    if (clip.manual && !all) {
+      const have = index[name] && existsSync(path.join(OUT, name + '.mp4'));
+      console.log(`${name}: manuellt klipp, ${have ? 'använder importerat' : 'SAKNAS – spela in med ?rec=' + fmt.id + ' och importera med import-clip.mjs'}`);
+      continue;
+    }
     if (!force && index[name] && existsSync(path.join(OUT, name + '.mp4'))) { console.log(`${name}: finns redan (hoppar över, --force spelar om)`); continue; }
     let result, lastErr;
     for (let attempt = 1; attempt <= 3 && !result; attempt++) {
