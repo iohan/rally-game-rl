@@ -4,7 +4,7 @@ import numpy as np
 from sim import Track, CONTROL, HALF_W, WORLD_W, WORLD_H
 
 MARGIN = 150            # minsta avstånd från mittlinje till världskant
-MIN_RADIUS = 110        # snävaste tillåtna kurva (Granskogsbanan: 118)
+MIN_RADIUS = 80         # snävaste tillåtna kurva i slumpbanor (Granskogsbanan: 118, Ovalen: 89)
 MIN_SELF_DIST = 2 * HALF_W + 25   # två delar av banan får inte ligga närmare än så (Granskogsbanan: 191)
 
 TEST_TRACKS = {
@@ -20,10 +20,10 @@ TEST_TRACKS = {
 def validate(track, min_radius=MIN_RADIUS):
     """Returnerar None om banan duger, annars en sträng med felet."""
     N = track.N
-    if (track.x < MARGIN).any() or (track.x > WORLD_W - MARGIN).any() or (track.y < MARGIN).any() or (track.y > WORLD_H - MARGIN).any():
-        return 'utanför världen'
     r = 1 / max(np.abs(track.curv).max(), 1e-9)
     if r < min_radius: return f'för snäv kurva (radie {r:.0f})'
+    if (track.x < MARGIN).any() or (track.x > WORLD_W - MARGIN).any() or (track.y < MARGIN).any() or (track.y > WORLD_H - MARGIN).any():
+        return 'utanför världen'
     X = np.stack([track.x, track.y], 1)
     D = np.sqrt(((X[:, None] - X[None]) ** 2).sum(2))
     ii = np.arange(N); sep = np.abs((ii[:, None] - ii[None] + N // 2) % N - N // 2)
@@ -36,33 +36,36 @@ def validate(track, min_radius=MIN_RADIUS):
 def random_control(rng):
     """Slumpade kontrollpunkter: jämnt fördelade vinklar runt världens mitt med jitter,
     och en mjukt varierande radie (indrag ger hårnålar/chikaner)."""
-    n = int(rng.integers(8, 14))
+    n = int(rng.integers(9, 15))
     cx, cy = WORLD_W / 2, WORLD_H / 2
     gap = 2 * math.pi / n
     ang = np.arange(n) * gap + rng.uniform(-0.3, 0.3, n) * gap + rng.uniform(0, 2 * math.pi)
     rx = rng.uniform(1400, 1900); ry = rng.uniform(950, 1300)
-    k = rng.uniform(0.5, 1.0, n)
-    k = 0.5 * k + 0.25 * (np.roll(k, 1) + np.roll(k, -1))   # jämna ut radien mellan grannar
+    k = rng.uniform(0.3, 1.0, n)
+    k = 0.8 * k + 0.1 * (np.roll(k, 1) + np.roll(k, -1))    # jämna ut radien lite mellan grannar
     pts = [[cx + math.cos(a) * rx * kk, cy + math.sin(a) * ry * kk] for a, kk in zip(ang, k)]
     if rng.random() < 0.5: pts.reverse()               # medurs eller moturs
     return [[float(x), float(y)] for x, y in pts]
 
 
-def make_random_track(rng, max_tries=200):
+TIGHT_RADIUS = 110      # banor med snävare kurva än så räknas som "svåra"
+EASY_ACCEPT = 0.35      # mjuka banor accepteras bara så här ofta, så svåra blir ~hälften av träningen
+
+
+def make_random_track(rng, max_tries=2000):
     for _ in range(max_tries):
         t = Track(random_control(rng))
-        if validate(t) is None: return t
+        if validate(t) is not None: continue
+        if 1 / np.abs(t.curv).max() < TIGHT_RADIUS or rng.random() < EASY_ACCEPT: return t
     raise RuntimeError('hittade ingen giltig slumpbana')
 
 
 if __name__ == '__main__':
     import time
     for name, c in TEST_TRACKS.items():
-        t = Track(c); print(f"{name:15s} N={t.N} längd={t.total:.0f} minradie={1/np.abs(t.curv).max():.0f}  {validate(t, 95) or 'OK'}")
-    rng = np.random.default_rng(0); t0 = time.time(); tries = 0; ok = []
-    while len(ok) < 50:
-        tries += 1; t = Track(random_control(rng))
-        if validate(t) is None: ok.append(t)
-    dt = time.time() - t0
-    print(f"slump: {len(ok)} giltiga av {tries} försök, {dt/len(ok)*1000:.0f} ms per giltig bana")
-    print(f"  längd {min(t.total for t in ok):.0f}-{max(t.total for t in ok):.0f}, minradie {min(1/np.abs(t.curv).max() for t in ok):.0f}-{max(1/np.abs(t.curv).max() for t in ok):.0f}, moturs-andel {np.mean([np.sign(t.curv).mean() < 0 for t in ok]):.2f}")
+        t = Track(c); print(f"{name:15s} N={t.N} längd={t.total:.0f} minradie={1/np.abs(t.curv).max():.0f}  {validate(t, 85) or 'OK'}")
+    rng = np.random.default_rng(0); t0 = time.time()
+    ok = [make_random_track(rng) for _ in range(100)]
+    dt = time.time() - t0; rad = [1 / np.abs(t.curv).max() for t in ok]
+    print(f"slump: 100 banor, {dt/len(ok)*1000:.0f} ms per bana")
+    print(f"  längd {min(t.total for t in ok):.0f}-{max(t.total for t in ok):.0f}, minradie <95: {sum(r < 95 for r in rad)}, 95-110: {sum(95 <= r < 110 for r in rad)}, >=110: {sum(r >= 110 for r in rad)}, moturs-andel {np.mean([np.sign(t.curv).mean() < 0 for t in ok]):.2f}")
