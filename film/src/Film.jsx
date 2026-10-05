@@ -50,7 +50,7 @@ const Caption = ({ text, fmt }) => {
   const s = fmt.width >= 1600 ? 1 : 0.9;
   const y = interpolate(f, [0, 12], [40, 0], { extrapolateRight: 'clamp' });
   return (
-    <div style={{ position: 'absolute', left: 0, right: 0, bottom: (fmt.height > fmt.width ? 330 : 30) * s,   // stående: ovanför minikartan display: 'flex', justifyContent: 'center', transform: `translateY(${y}px)`, opacity: interpolate(f, [0, 12], [0, 1], { extrapolateRight: 'clamp' }) }}>
+    <div style={{ position: 'absolute', left: 0, right: 0, bottom: (fmt.height > fmt.width ? 330 : 30) * s, display: 'flex', justifyContent: 'center', transform: `translateY(${y}px)`, opacity: interpolate(f, [0, 12], [0, 1], { extrapolateRight: 'clamp' }) }}>
       <div style={{ background: 'rgba(0,0,0,0.72)', color: 'white', fontFamily: FONT, fontSize: 30 * s, fontWeight: 600, padding: `${14 * s}px ${30 * s}px`, borderRadius: 14 * s, maxWidth: fmt.width >= 1600 ? fmt.width * 0.55 : fmt.width * 0.8, textAlign: 'center', borderLeft: `6px solid ${YELLOW}` }}>{text}</div>
     </div>
   );
