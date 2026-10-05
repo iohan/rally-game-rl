@@ -29,7 +29,7 @@ Bara steg 1 (inget AI-läge) och 2a (terminal) kräver checkout av sin tagg.
 
 ## Filmerna
 
-Spelas in och renderas automatiskt med `film/make.sh` (se README). En film per steg ovan, 16:9 och 1:1.
+Spelas in och renderas automatiskt med `film/make.sh` (se README). En film per steg ovan, 16:9 (liggande) och 9:16 (stående), på engelska.
 Steg 1 och 2a körs av den regelstyrda föraren (`driver=rule` i filmläget), eftersom ingen människa sitter vid tangenterna
 vid inspelningen; byt gärna ut steg 1-klippet mot en egen skärminspelning.
 

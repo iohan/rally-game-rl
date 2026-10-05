@@ -21,7 +21,7 @@ python3 -m http.server 8765
 |---|---|
 | `↑` `↓` | gas / broms och back |
 | `←` `→` | sväng |
-| `A` | AI:n tar över ratten (piltangent eller `A` igen = du tar över) |
+| `A` | AI:n tar över ratten (piltangent eller `A` igen = du tar över). HUD visar "AI DRIVING" |
 | `S` | visa/dölj AI:ns sensorer (7 strålar, grön = fritt, röd = kant nära) |
 | `N` | byt AI-modell (9 st, från 25k träningssteg till slumpbanemodellen) |
 | `T` | byt bana (Granskogsbanan, Tallmon, Spegelbanan, Ovalen, tre slumpbanor) |
@@ -62,7 +62,7 @@ Efter export: `node check_ai.js` verifierar att JS-föraren fattar exakt samma b
 ## Filmer
 
 `film/` innehåller en pipeline som spelar in spelet deterministiskt (Playwright) och komponerar filmer med Remotion,
-en per steg i [HISTORIK.md](HISTORIK.md), i två format: 1920×1080 (16:9) och 1080×1080 (LinkedIn/Instagram).
+en per steg i [HISTORIK.md](HISTORIK.md), i två format: 1920×1080 (16:9, liggande för LinkedIn) och 1080×1920 (9:16, stående för Reels/Shorts/TikTok). Filmerna och spelets HUD är på engelska.
 
 ```bash
 film/make.sh
