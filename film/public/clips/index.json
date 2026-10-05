@@ -1,3 +1,24 @@
 {
- "step1_game_16x9": 720
+ "step1_game_16x9": 720,
+ "step1_game_9x16": 720,
+ "step2a_rule_16x9": 720,
+ "step2a_rule_9x16": 720,
+ "step2b_ai_16x9": 656,
+ "step2b_ai_9x16": 656,
+ "step2c_tallmon_16x9": 420,
+ "step2c_tallmon_9x16": 420,
+ "step2c_oval_16x9": 481,
+ "step2c_oval_9x16": 481,
+ "step3_oval_16x9": 627,
+ "step3_oval_9x16": 627,
+ "step3_gransk_16x9": 360,
+ "step3_gransk_9x16": 360,
+ "step4_sensors_16x9": 720,
+ "step4_sensors_9x16": 720,
+ "step5_25k_16x9": 150,
+ "step5_25k_9x16": 150,
+ "step5_50k_16x9": 481,
+ "step5_50k_9x16": 481,
+ "step5_500k_16x9": 656,
+ "step5_500k_9x16": 656
 }

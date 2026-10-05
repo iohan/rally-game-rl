@@ -6,6 +6,6 @@ set -e
 cd "$(dirname "$0")"
 [ -d node_modules ] || npm install --no-audit --no-fund
 echo "== kurvdata"; ../train/.venv/bin/python ../train/export_curves_json.py
-echo "== spelklipp"; node record.mjs "$1"
+echo "== spelklipp"; node record.mjs "$1" --force
 echo "== render";    node render.mjs "$1"
 echo "klart: film/out/"

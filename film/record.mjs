@@ -1,7 +1,8 @@
 // Spelar in spelklipp med Playwright: spelet stegas deterministiskt frame för frame (window.filmAdvance)
 // och varje frame (JPEG) pipas till ffmpeg. Resultat: public/clips/<namn>_<format>.mp4 + index.json.
-//   node record.mjs            alla klipp
-//   node record.mjs steg2c     bara klipp vars scen-id börjar så
+//   node record.mjs                 klipp som saknas
+//   node record.mjs step2c          bara klipp vars scen-id börjar så
+//   node record.mjs "" --force      spela om allt (make.sh gör detta)
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -16,6 +17,7 @@ const ROOT = path.join(here, '..');           // spelets mapp (index.html)
 const OUT = path.join(here, 'public', 'clips');
 const FFMPEG = path.join(here, 'node_modules', '.bin', 'remotion');
 const filter = process.argv[2] || '';
+const force = process.argv.includes('--force');
 
 // Liten statisk server för spelet (python3 -m http.server fungerar också, men detta är självförsörjande)
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json' };
@@ -34,8 +36,8 @@ async function record(clip, fmt) {
   const url = `http://127.0.0.1:${PORT}/?` + new URLSearchParams(params);
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: fmt.width, height: fmt.height }, deviceScaleFactor: 1 });
-  await page.goto(url);
-  await page.waitForFunction(() => window.filmState && window.filmState().ready, null, { timeout: 20000 });
+  await page.goto(url, { timeout: 60000 });
+  await page.waitForFunction(() => window.filmState && window.filmState().ready, null, { timeout: 60000 });
   const ff = spawn(FFMPEG, ['ffmpeg', '-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-',
     '-vf', `scale=${fmt.width}:${fmt.height}:flags=lanczos`, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '17', '-preset', 'medium', file], { stdio: ['pipe', 'inherit', 'inherit'] });
   const maxFrames = Math.round(clip.seconds * FPS);
@@ -65,8 +67,15 @@ const index = existsSync(indexFile) ? JSON.parse(await readFile(indexFile, 'utf8
 for (const scene of SCENES) {
   if (!scene.id.startsWith(filter) || !scene.clips) continue;
   for (const clip of scene.clips) for (const fmt of FORMATS) {
-    const [name, frames] = await record(clip, fmt);
-    index[name] = frames;
+    const name = `${clip.name}_${fmt.id}`;
+    if (!force && index[name] && existsSync(path.join(OUT, name + '.mp4'))) { console.log(`${name}: finns redan (hoppar över, --force spelar om)`); continue; }
+    let result, lastErr;
+    for (let attempt = 1; attempt <= 3 && !result; attempt++) {
+      try { result = await record(clip, fmt); }
+      catch (e) { lastErr = e; console.log(`${name}: försök ${attempt} misslyckades (${e.message.split('\n')[0]})`); }
+    }
+    if (!result) throw lastErr;
+    index[result[0]] = result[1];
     await writeFile(indexFile, JSON.stringify(index, null, 1));
   }
 }
